@@ -105,6 +105,32 @@ configure_user() {
     log "Installed $(wc -l < "${ssh_dir}/authorized_keys") SSH key(s)"
 }
 
+# Drop in sshd hardening config + base sudoers entry. Both validated before
+# install (sshd -t / visudo -cf) so we never lock ourselves out.
+configure_sshd_and_sudo() {
+    log "Configuring sshd hardening"
+    cat > /etc/ssh/sshd_config.d/90-jinx.conf <<'EOF'
+# Jinx hardening — see spec §4.2.
+PasswordAuthentication no
+PermitRootLogin no
+AuthenticationMethods publickey
+ChallengeResponseAuthentication no
+KbdInteractiveAuthentication no
+EOF
+
+    # Validate before reload — sshd refuses to start with a bad config.
+    sshd -t
+    systemctl reload ssh
+
+    log "Configuring sudoers for $LINUX_USER"
+    local sudoers_tmp
+    sudoers_tmp=$(mktemp)
+    printf '%s ALL=(ALL) ALL\n' "$LINUX_USER" > "$sudoers_tmp"
+    visudo -cf "$sudoers_tmp"  # exits non-zero on syntax error
+    install -m 0440 -o root -g root "$sudoers_tmp" "/etc/sudoers.d/00-${LINUX_USER}"
+    rm -f "$sudoers_tmp"
+}
+
 # --- Main ---
 main() {
     require_root
@@ -114,6 +140,7 @@ main() {
     configure_ufw
     configure_unattended_upgrades
     configure_user
+    configure_sshd_and_sudo
     log "Bootstrap complete"
 }
 
