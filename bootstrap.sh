@@ -27,12 +27,35 @@ require_root() {
     fi
 }
 
+# Install OS packages and Caddy from the official Cloudsmith apt repo.
+# Idempotent: apt-get install --no-upgrade is a no-op if already installed.
+install_packages() {
+    log "Updating apt cache"
+    DEBIAN_FRONTEND=noninteractive apt-get update -qq
+
+    log "Installing baseline packages"
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates curl gnupg ufw unattended-upgrades
+
+    if ! command -v caddy >/dev/null; then
+        log "Adding Caddy apt repo"
+        curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+            | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+        curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+            | tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
+        DEBIAN_FRONTEND=noninteractive apt-get update -qq
+        DEBIAN_FRONTEND=noninteractive apt-get install -y caddy
+    else
+        log "Caddy already installed: $(caddy version | head -1)"
+    fi
+}
+
 # --- Main ---
 main() {
     require_root
     log "Starting Jinx bootstrap at $(date -u --iso-8601=seconds)"
     log "Config: user=$LINUX_USER handle=$GITHUB_HANDLE srv=$SRV_ROOT"
-    # Subsequent tasks fill in sections below.
+    install_packages
     log "Bootstrap complete"
 }
 
