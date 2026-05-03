@@ -14,11 +14,11 @@ example.jinx.generalproducts.io {
     tls /etc/ssl/jinx/cert.pem /etc/ssl/jinx/key.pem
 
     handle /api/* {
-        reverse_proxy localhost:3100
+        reverse_proxy 127.0.0.1:3100
     }
 
     handle {
-        reverse_proxy localhost:3000
+        reverse_proxy 127.0.0.1:3000
     }
 
     log {
