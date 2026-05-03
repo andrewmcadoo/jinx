@@ -334,7 +334,7 @@ half added to GitHub at https://github.com/settings/keys (so
 
 ## 6. Bootstrap and repo layout
 
-A new git repo `~/Desktop/Projects/Workspace/jinx`, pushed to
+A new git repo `~/Desktop/Workspace/jinx`, pushed to
 `github.com/andrewmcadoo/jinx`. (If a `generalproducts` GitHub org is created
 later, transfer the repo and update remotes; not blocking.) Contents:
 

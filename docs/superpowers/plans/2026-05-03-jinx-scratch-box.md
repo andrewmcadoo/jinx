@@ -15,11 +15,11 @@
 
 ## Conventions used in this plan
 
-- **All paths are absolute** to `/Users/aj/Desktop/Projects/Workspace/jinx/` unless prefixed with `/etc`, `/srv`, etc. (which refer to paths *on the Jinx box*).
+- **All paths are absolute** to `/Users/aj/Desktop/Workspace/jinx/` unless prefixed with `/etc`, `/srv`, etc. (which refer to paths *on the Jinx box*).
 - **Each task ends in a commit.** Add files individually (`git add <file>`) per AJ's CLAUDE.md — never `git add .`.
 - **Test discipline for infra code:** instead of unit tests, each artifact is verified by its native validator before commit (`shellcheck`, `caddy validate`, `systemd-analyze verify`, `visudo -cf`). CI re-runs all validators on every push.
 - **Interactive steps** (cloud consoles, browser auth) are flagged `[INTERACTIVE — AJ executes]`. The plan describes exactly what to click/run.
-- **Working directory:** `/Users/aj/Desktop/Projects/Workspace/jinx/` for all commands unless noted.
+- **Working directory:** `/Users/aj/Desktop/Workspace/jinx/` for all commands unless noted.
 
 ---
 
@@ -30,7 +30,7 @@
 - [ ] **Step 0.1: Verify the jinx repo exists with the spec**
 
 ```bash
-test -f /Users/aj/Desktop/Projects/Workspace/jinx/docs/superpowers/specs/2026-05-03-jinx-scratch-box-design.md && echo OK
+test -f /Users/aj/Desktop/Workspace/jinx/docs/superpowers/specs/2026-05-03-jinx-scratch-box-design.md && echo OK
 ```
 
 Expected: `OK`. If missing, return to brainstorming skill — the spec is the prerequisite for this plan.
@@ -87,7 +87,7 @@ No commit for Task 0 (verification only).
 ## Task 1: Repo scaffolding + README skeleton
 
 **Files:**
-- Create: `/Users/aj/Desktop/Projects/Workspace/jinx/README.md`
+- Create: `/Users/aj/Desktop/Workspace/jinx/README.md`
 
 - [ ] **Step 1.1: Write README.md**
 
@@ -116,7 +116,7 @@ See `RUNBOOK.md` § "Adding a project".
 - [ ] **Step 1.2: Verify the README renders**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 cat README.md | head -5
 ```
 
@@ -125,7 +125,7 @@ Expected: first five lines visible, starting with `# Jinx`.
 - [ ] **Step 1.3: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add README.md
 git commit -m "docs: add README with quickstart links"
 ```
@@ -135,7 +135,7 @@ git commit -m "docs: add README with quickstart links"
 ## Task 2: PORTS.md (port allocation table)
 
 **Files:**
-- Create: `/Users/aj/Desktop/Projects/Workspace/jinx/PORTS.md`
+- Create: `/Users/aj/Desktop/Workspace/jinx/PORTS.md`
 
 - [ ] **Step 2.1: Write PORTS.md**
 
@@ -165,7 +165,7 @@ ports across projects — even if a project is paused, leave its row.
 - [ ] **Step 2.2: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add PORTS.md
 git commit -m "docs: add port allocation table"
 ```
@@ -175,7 +175,7 @@ git commit -m "docs: add port allocation table"
 ## Task 3: bootstrap.sh — skeleton with idempotency guard
 
 **Files:**
-- Create: `/Users/aj/Desktop/Projects/Workspace/jinx/bootstrap.sh`
+- Create: `/Users/aj/Desktop/Workspace/jinx/bootstrap.sh`
 
 The bootstrap script will be built incrementally over Tasks 3–9. Each task adds one section and commits. Every commit leaves `bootstrap.sh` in a runnable, shellcheck-clean state.
 
@@ -225,7 +225,7 @@ main "$@"
 - [ ] **Step 3.2: Make executable and shellcheck**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 chmod +x bootstrap.sh
 shellcheck bootstrap.sh
 ```
@@ -235,7 +235,7 @@ Expected: no output (clean). If shellcheck reports anything, fix and re-run.
 - [ ] **Step 3.3: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add bootstrap.sh
 git commit -m "feat(bootstrap): skeleton with logging + root guard"
 ```
@@ -245,7 +245,7 @@ git commit -m "feat(bootstrap): skeleton with logging + root guard"
 ## Task 4: bootstrap.sh — apt update + package install
 
 **Files:**
-- Modify: `/Users/aj/Desktop/Projects/Workspace/jinx/bootstrap.sh`
+- Modify: `/Users/aj/Desktop/Workspace/jinx/bootstrap.sh`
 
 - [ ] **Step 4.1: Replace the `# Subsequent tasks fill in sections below.` line in `main()` with the apt + Caddy install section, and add the helper function above `main()`**
 
@@ -285,7 +285,7 @@ Then replace the `# Subsequent tasks fill in sections below.` line with:
 - [ ] **Step 4.2: shellcheck**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 shellcheck bootstrap.sh
 ```
 
@@ -294,7 +294,7 @@ Expected: clean.
 - [ ] **Step 4.3: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add bootstrap.sh
 git commit -m "feat(bootstrap): install baseline packages + Caddy from Cloudsmith"
 ```
@@ -304,7 +304,7 @@ git commit -m "feat(bootstrap): install baseline packages + Caddy from Cloudsmit
 ## Task 5: bootstrap.sh — UFW firewall + unattended-upgrades
 
 **Files:**
-- Modify: `/Users/aj/Desktop/Projects/Workspace/jinx/bootstrap.sh`
+- Modify: `/Users/aj/Desktop/Workspace/jinx/bootstrap.sh`
 
 - [ ] **Step 5.1: Add two helper functions above `main()`**
 
@@ -351,7 +351,7 @@ Add these two calls inside `main()` after `install_packages`:
 - [ ] **Step 5.2: shellcheck**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 shellcheck bootstrap.sh
 ```
 
@@ -360,7 +360,7 @@ Expected: clean.
 - [ ] **Step 5.3: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add bootstrap.sh
 git commit -m "feat(bootstrap): UFW (22+443 only) + unattended-upgrades"
 ```
@@ -370,7 +370,7 @@ git commit -m "feat(bootstrap): UFW (22+443 only) + unattended-upgrades"
 ## Task 6: bootstrap.sh — andrew user + GitHub-pulled SSH keys
 
 **Files:**
-- Modify: `/Users/aj/Desktop/Projects/Workspace/jinx/bootstrap.sh`
+- Modify: `/Users/aj/Desktop/Workspace/jinx/bootstrap.sh`
 
 - [ ] **Step 6.1: Add helper function above `main()`**
 
@@ -411,7 +411,7 @@ Add to `main()` after `configure_unattended_upgrades`:
 - [ ] **Step 6.2: shellcheck**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 shellcheck bootstrap.sh
 ```
 
@@ -420,7 +420,7 @@ Expected: clean.
 - [ ] **Step 6.3: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add bootstrap.sh
 git commit -m "feat(bootstrap): create andrew user + pull SSH keys from GitHub"
 ```
@@ -430,7 +430,7 @@ git commit -m "feat(bootstrap): create andrew user + pull SSH keys from GitHub"
 ## Task 7: bootstrap.sh — sshd hardening + sudoers
 
 **Files:**
-- Modify: `/Users/aj/Desktop/Projects/Workspace/jinx/bootstrap.sh`
+- Modify: `/Users/aj/Desktop/Workspace/jinx/bootstrap.sh`
 
 - [ ] **Step 7.1: Add helper function above `main()`**
 
@@ -471,7 +471,7 @@ Add to `main()` after `configure_user`:
 - [ ] **Step 7.2: shellcheck**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 shellcheck bootstrap.sh
 ```
 
@@ -480,7 +480,7 @@ Expected: clean.
 - [ ] **Step 7.3: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add bootstrap.sh
 git commit -m "feat(bootstrap): sshd hardening drop-in + sudoers for andrew"
 ```
@@ -490,7 +490,7 @@ git commit -m "feat(bootstrap): sshd hardening drop-in + sudoers for andrew"
 ## Task 8: bootstrap.sh — /srv layout + Caddy directories
 
 **Files:**
-- Modify: `/Users/aj/Desktop/Projects/Workspace/jinx/bootstrap.sh`
+- Modify: `/Users/aj/Desktop/Workspace/jinx/bootstrap.sh`
 
 - [ ] **Step 8.1: Add helper function above `main()`**
 
@@ -528,7 +528,7 @@ Add to `main()` after `configure_sshd_and_sudo`:
 - [ ] **Step 8.2: shellcheck**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 shellcheck bootstrap.sh
 ```
 
@@ -537,7 +537,7 @@ Expected: clean.
 - [ ] **Step 8.3: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add bootstrap.sh
 git commit -m "feat(bootstrap): /srv layout, Caddy dirs, placeholder apex page"
 ```
@@ -547,7 +547,7 @@ git commit -m "feat(bootstrap): /srv layout, Caddy dirs, placeholder apex page"
 ## Task 9: bootstrap.sh — final manual-step instructions
 
 **Files:**
-- Modify: `/Users/aj/Desktop/Projects/Workspace/jinx/bootstrap.sh`
+- Modify: `/Users/aj/Desktop/Workspace/jinx/bootstrap.sh`
 
 - [ ] **Step 9.1: Add helper function above `main()`**
 
@@ -586,7 +586,7 @@ Add to `main()` after `configure_filesystem` and before the closing `log "Bootst
 - [ ] **Step 9.2: shellcheck**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 shellcheck bootstrap.sh
 ```
 
@@ -595,7 +595,7 @@ Expected: clean.
 - [ ] **Step 9.3: Run a self-test by source-loading bootstrap.sh in a subshell to verify bash syntax**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 bash -n bootstrap.sh && echo "syntax OK"
 ```
 
@@ -604,7 +604,7 @@ Expected: `syntax OK`.
 - [ ] **Step 9.4: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add bootstrap.sh
 git commit -m "feat(bootstrap): print remaining manual steps after first run"
 ```
@@ -614,7 +614,7 @@ git commit -m "feat(bootstrap): print remaining manual steps after first run"
 ## Task 10: sshd config drop-in (canonical version checked into repo)
 
 **Files:**
-- Create: `/Users/aj/Desktop/Projects/Workspace/jinx/sshd/90-jinx.conf`
+- Create: `/Users/aj/Desktop/Workspace/jinx/sshd/90-jinx.conf`
 
 The same content the bootstrap script writes — checked in so changes can be reviewed and re-deployed without re-running bootstrap.
 
@@ -632,7 +632,7 @@ KbdInteractiveAuthentication no
 - [ ] **Step 10.2: Verify it matches what bootstrap.sh embeds**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 diff <(sed -n '/cat > \/etc\/ssh\/sshd_config.d\/90-jinx.conf/,/^EOF$/p' bootstrap.sh \
         | sed -e '1d' -e '$d') sshd/90-jinx.conf
 ```
@@ -642,7 +642,7 @@ Expected: no output (files identical).
 - [ ] **Step 10.3: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add sshd/90-jinx.conf
 git commit -m "feat(sshd): canonical hardening drop-in"
 ```
@@ -652,7 +652,7 @@ git commit -m "feat(sshd): canonical hardening drop-in"
 ## Task 11: Caddyfile (base config)
 
 **Files:**
-- Create: `/Users/aj/Desktop/Projects/Workspace/jinx/caddy/Caddyfile`
+- Create: `/Users/aj/Desktop/Workspace/jinx/caddy/Caddyfile`
 
 - [ ] **Step 11.1: Write `caddy/Caddyfile`**
 
@@ -677,7 +677,7 @@ import sites/*.caddy
 - [ ] **Step 11.2: Validate locally if Caddy is installed**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 if command -v caddy >/dev/null; then
     caddy validate --config caddy/Caddyfile
 else
@@ -690,7 +690,7 @@ Expected: `Valid configuration` if caddy is local, otherwise the skip message. (
 - [ ] **Step 11.3: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add caddy/Caddyfile
 git commit -m "feat(caddy): base Caddyfile importing sites/*.caddy"
 ```
@@ -700,7 +700,7 @@ git commit -m "feat(caddy): base Caddyfile importing sites/*.caddy"
 ## Task 12: Apex Caddy site (`jinx.generalproducts.io`)
 
 **Files:**
-- Create: `/Users/aj/Desktop/Projects/Workspace/jinx/caddy/sites/00-apex.caddy`
+- Create: `/Users/aj/Desktop/Workspace/jinx/caddy/sites/00-apex.caddy`
 
 - [ ] **Step 12.1: Write `caddy/sites/00-apex.caddy`**
 
@@ -721,7 +721,7 @@ jinx.generalproducts.io {
 - [ ] **Step 12.2: Validate (if local Caddy)**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 if command -v caddy >/dev/null; then
     caddy validate --config caddy/Caddyfile --adapter caddyfile
 fi
@@ -732,7 +732,7 @@ Expected: `Valid configuration` or skip if no local caddy. (Validation against `
 - [ ] **Step 12.3: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add caddy/sites/00-apex.caddy
 git commit -m "feat(caddy): apex site serving /srv/_apex"
 ```
@@ -742,7 +742,7 @@ git commit -m "feat(caddy): apex site serving /srv/_apex"
 ## Task 13: Example Caddy site template
 
 **Files:**
-- Create: `/Users/aj/Desktop/Projects/Workspace/jinx/caddy/sites/_example.caddy`
+- Create: `/Users/aj/Desktop/Workspace/jinx/caddy/sites/_example.caddy`
 
 - [ ] **Step 13.1: Write `caddy/sites/_example.caddy`**
 
@@ -780,7 +780,7 @@ example.jinx.generalproducts.io {
 - [ ] **Step 13.2: Verify the underscore-prefix prevents real loading on the server**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 grep -E "^import" caddy/Caddyfile
 ```
 
@@ -789,7 +789,7 @@ Expected: `import sites/*.caddy`. Files starting with `_` match `*` per shell gl
 - [ ] **Step 13.3: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add caddy/sites/_example.caddy
 git commit -m "feat(caddy): example project site template"
 ```
@@ -799,7 +799,7 @@ git commit -m "feat(caddy): example project site template"
 ## Task 14: Apex landing page (`apex/index.html`)
 
 **Files:**
-- Create: `/Users/aj/Desktop/Projects/Workspace/jinx/apex/index.html`
+- Create: `/Users/aj/Desktop/Workspace/jinx/apex/index.html`
 
 - [ ] **Step 14.1: Write `apex/index.html`**
 
@@ -845,7 +845,7 @@ git commit -m "feat(caddy): example project site template"
 - [ ] **Step 14.2: Sanity-check the HTML**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 grep -c '<title>Jinx</title>' apex/index.html
 ```
 
@@ -854,7 +854,7 @@ Expected: `1`.
 - [ ] **Step 14.3: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add apex/index.html
 git commit -m "feat(apex): static landing page"
 ```
@@ -864,7 +864,7 @@ git commit -m "feat(apex): static landing page"
 ## Task 15: Example systemd unit template
 
 **Files:**
-- Create: `/Users/aj/Desktop/Projects/Workspace/jinx/systemd/_example.service`
+- Create: `/Users/aj/Desktop/Workspace/jinx/systemd/_example.service`
 
 - [ ] **Step 15.1: Write `systemd/_example.service`**
 
@@ -914,7 +914,7 @@ WantedBy=multi-user.target
 - [ ] **Step 15.2: Validate with `systemd-analyze` if available**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 if command -v systemd-analyze >/dev/null; then
     systemd-analyze verify systemd/_example.service 2>&1 | grep -v "Failed to find module" || echo "OK"
 else
@@ -927,7 +927,7 @@ Expected: `OK` on Linux, skip message on macOS. (`systemd-analyze verify` may co
 - [ ] **Step 15.3: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add systemd/_example.service
 git commit -m "feat(systemd): example unit template with hardening"
 ```
@@ -937,7 +937,7 @@ git commit -m "feat(systemd): example unit template with hardening"
 ## Task 16: SSH key refresh script
 
 **Files:**
-- Create: `/Users/aj/Desktop/Projects/Workspace/jinx/scripts/refresh-ssh-keys.sh`
+- Create: `/Users/aj/Desktop/Workspace/jinx/scripts/refresh-ssh-keys.sh`
 
 - [ ] **Step 16.1: Write `scripts/refresh-ssh-keys.sh`**
 
@@ -977,7 +977,7 @@ echo "Refreshed $(wc -l < "${SSH_DIR}/authorized_keys") key(s) for ${LINUX_USER}
 - [ ] **Step 16.2: shellcheck and chmod**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 chmod +x scripts/refresh-ssh-keys.sh
 shellcheck scripts/refresh-ssh-keys.sh
 ```
@@ -987,7 +987,7 @@ Expected: clean.
 - [ ] **Step 16.3: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add scripts/refresh-ssh-keys.sh
 git commit -m "feat(scripts): refresh-ssh-keys re-pulls GitHub keys"
 ```
@@ -997,7 +997,7 @@ git commit -m "feat(scripts): refresh-ssh-keys re-pulls GitHub keys"
 ## Task 17: RUNBOOK.md
 
 **Files:**
-- Create: `/Users/aj/Desktop/Projects/Workspace/jinx/RUNBOOK.md`
+- Create: `/Users/aj/Desktop/Workspace/jinx/RUNBOOK.md`
 
 - [ ] **Step 17.1: Write `RUNBOOK.md`**
 
@@ -1136,7 +1136,7 @@ If a sudoers/sshd change locks you out:
 - [ ] **Step 17.2: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add RUNBOOK.md
 git commit -m "docs: runbook (add project, rotate certs, restore, lockout recovery)"
 ```
@@ -1146,7 +1146,7 @@ git commit -m "docs: runbook (add project, rotate certs, restore, lockout recove
 ## Task 18: GitHub Actions lint workflow
 
 **Files:**
-- Create: `/Users/aj/Desktop/Projects/Workspace/jinx/.github/workflows/lint.yml`
+- Create: `/Users/aj/Desktop/Workspace/jinx/.github/workflows/lint.yml`
 
 - [ ] **Step 18.1: Write `.github/workflows/lint.yml`**
 
@@ -1223,7 +1223,7 @@ jobs:
 - [ ] **Step 18.2: Validate workflow syntax with `gh workflow view`** (after push) — for now, just confirm the file parses as YAML
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 python3 -c "import yaml; yaml.safe_load(open('.github/workflows/lint.yml'))" && echo "yaml OK"
 ```
 
@@ -1232,7 +1232,7 @@ Expected: `yaml OK`.
 - [ ] **Step 18.3: Commit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git add .github/workflows/lint.yml
 git commit -m "ci: shellcheck, caddy validate, systemd-analyze, visudo"
 ```
@@ -1246,7 +1246,7 @@ git commit -m "ci: shellcheck, caddy validate, systemd-analyze, visudo"
 - [ ] **Step 19.1: Run shellcheck on every shell file**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 shellcheck bootstrap.sh scripts/*.sh
 ```
 
@@ -1255,7 +1255,7 @@ Expected: clean.
 - [ ] **Step 19.2: Verify all files exist that the spec calls for**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 for f in README.md RUNBOOK.md PORTS.md bootstrap.sh \
          caddy/Caddyfile caddy/sites/00-apex.caddy caddy/sites/_example.caddy \
          apex/index.html systemd/_example.service sshd/90-jinx.conf \
@@ -1271,7 +1271,7 @@ Expected: every line `OK ...`.
 - [ ] **Step 19.3: View commit log**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git log --oneline
 ```
 
@@ -1288,7 +1288,7 @@ Expected: ~18 commits in the order matching this plan.
 - [ ] **Step 20.1: Create the GitHub repo**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 gh repo create andrewmcadoo/jinx --private --source=. --remote=origin --push
 ```
 
@@ -1297,7 +1297,7 @@ Expected: repo created, default branch `main`, all commits pushed.
 - [ ] **Step 20.2: Verify CI green**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 sleep 30  # let GitHub register the workflow
 gh run watch --exit-status
 ```
@@ -1315,7 +1315,7 @@ Expected: all four lint jobs pass. If a job fails, fix locally, commit, push, re
 - [ ] **Step 21.1: Verify the bootstrap.sh fits within Lightsail's user-data limit**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 wc -c bootstrap.sh
 ```
 
@@ -1344,7 +1344,7 @@ Expected: the row with price `10.0` is the right one. Note the exact `bundleId` 
 - [ ] **Step 21.4: Launch the instance**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 aws lightsail create-instances \
   --region us-east-1 \
   --availability-zone us-east-1a \
@@ -1518,7 +1518,7 @@ Host jinx
 - [ ] **Step 24.3: scp the Caddy base config and apex site**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 scp caddy/Caddyfile jinx:/tmp/
 scp caddy/sites/00-apex.caddy jinx:/tmp/
 ssh jinx 'sudo install -m 0644 -o root -g root /tmp/Caddyfile /etc/caddy/Caddyfile
@@ -1531,7 +1531,7 @@ Expected: silent success.
 - [ ] **Step 24.4: scp the apex landing page**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 scp apex/index.html jinx:/tmp/
 ssh jinx 'sudo install -m 0644 -o andrew -g andrew /tmp/index.html /srv/_apex/index.html
           rm /tmp/index.html'
@@ -1560,7 +1560,7 @@ Expected: `Valid configuration`.
 - [ ] **Step 24.7: Install the refresh-ssh-keys script**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 scp scripts/refresh-ssh-keys.sh jinx:/tmp/
 ssh jinx 'sudo install -m 0755 -o root -g root /tmp/refresh-ssh-keys.sh /usr/local/bin/refresh-ssh-keys
           rm /tmp/refresh-ssh-keys.sh'
@@ -1574,13 +1574,17 @@ ssh jinx 'sudo install -m 0755 -o root -g root /tmp/refresh-ssh-keys.sh /usr/loc
 
 **Files:** none (verification)
 
-- [ ] **Step 25.1: Enable and start Caddy**
+- [ ] **Step 25.1: Enable, reload, and start Caddy**
+
+The Caddy debian package's postinst already started caddy on first install (with the package-default Caddyfile). Our config landed in Step 24.3 but isn't loaded yet — `enable --now` is a no-op on an already-running service. An explicit `reload` is required to pick up our `/etc/caddy/Caddyfile` and `sites/00-apex.caddy`.
 
 ```bash
-ssh jinx 'sudo systemctl enable --now caddy && sudo systemctl status caddy --no-pager'
+ssh jinx 'sudo systemctl enable caddy \
+       && sudo systemctl reload caddy \
+       && sudo systemctl status caddy --no-pager'
 ```
 
-Expected: status `active (running)`.
+Expected: status `active (running)`, no errors in the recent log lines.
 
 - [ ] **Step 25.2: HTTPS smoke test from laptop**
 
@@ -1659,7 +1663,7 @@ Expected: `Permission denied (publickey).` — password auth is rejected.
 - [ ] **Step 26.1: Commit the plan file (if not already committed)**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git status docs/superpowers/plans/2026-05-03-jinx-scratch-box.md
 ```
 
@@ -1678,14 +1682,14 @@ git push
 - [ ] **Step 26.3: Close the bd issue**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/mim
+cd /Users/aj/Desktop/Workspace/mim
 bd close mim-qb6 --reason="Jinx box live at https://jinx.generalproducts.io. Project deploys (mim, others) tracked as separate issues."
 ```
 
 - [ ] **Step 26.4: File the follow-up beads issue for deploying mim to Jinx**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/mim
+cd /Users/aj/Desktop/Workspace/mim
 bd create \
   --title="Deploy mim to Jinx" \
   --description="Now that jinx.generalproducts.io is live, deploy a current build of mim at mim.jinx.generalproducts.io. Includes: pick port assignments per Jinx PORTS.md; write deploy.sh modeled on Clipper's; provision Postgres+pgvector on the box; write Caddy site block + systemd units (mim-web, mim-api); load .env.production with non-prod secrets. Out of scope of this issue: mim's PRD §22 production stack — that's separate." \
@@ -1696,10 +1700,10 @@ bd create \
 - [ ] **Step 26.5: Push everything one more time**
 
 ```bash
-cd /Users/aj/Desktop/Projects/Workspace/jinx
+cd /Users/aj/Desktop/Workspace/jinx
 git push
 
-cd /Users/aj/Desktop/Projects/Workspace/mim
+cd /Users/aj/Desktop/Workspace/mim
 bd dolt push
 git status  # should be clean (no code changes in mim from this plan)
 ```
