@@ -1,0 +1,11 @@
+jinx.generalproducts.io {
+    tls /etc/ssl/jinx/cert.pem /etc/ssl/jinx/key.pem
+
+    root * /srv/_apex
+    file_server
+
+    log {
+        output file /var/log/caddy/apex.log
+        format json
+    }
+}
