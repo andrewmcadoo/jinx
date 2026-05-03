@@ -50,12 +50,43 @@ install_packages() {
     fi
 }
 
+# Configure UFW: deny inbound by default, allow SSH (22) and HTTPS (443).
+# Port 80 is intentionally NOT opened — see spec §3.2.
+configure_ufw() {
+    log "Configuring UFW"
+    ufw --force reset >/dev/null
+    ufw default deny incoming
+    ufw default allow outgoing
+    ufw allow 22/tcp comment 'SSH'
+    ufw allow 443/tcp comment 'HTTPS via Caddy'
+    ufw --force enable
+    ufw status verbose | tee -a "$LOG_FILE"
+}
+
+# Enable unattended security upgrades. Reboot at 04:00 UTC if a kernel
+# update requires it.
+configure_unattended_upgrades() {
+    log "Configuring unattended-upgrades"
+    cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT::Periodic::AutocleanInterval "7";
+EOF
+    cat > /etc/apt/apt.conf.d/52unattended-upgrades-jinx <<'EOF'
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "04:00";
+EOF
+    systemctl enable --now unattended-upgrades
+}
+
 # --- Main ---
 main() {
     require_root
     log "Starting Jinx bootstrap at $(date -u --iso-8601=seconds)"
     log "Config: user=$LINUX_USER handle=$GITHUB_HANDLE srv=$SRV_ROOT"
     install_packages
+    configure_ufw
+    configure_unattended_upgrades
     log "Bootstrap complete"
 }
 
