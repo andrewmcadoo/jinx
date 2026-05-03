@@ -1,0 +1,15 @@
+{
+    admin off
+    # auto_https off disables both ACME issuance AND HTTP→HTTPS redirect.
+    # We don't need either: certs come from Cloudflare Origin (spec §3.4),
+    # and HTTP→HTTPS happens at Cloudflare's edge before traffic reaches us
+    # (spec §3.2 + §3.3 "Always Use HTTPS").
+    auto_https off
+
+    log default {
+        output file /var/log/caddy/caddy.log
+        format json
+    }
+}
+
+import sites/*.caddy
