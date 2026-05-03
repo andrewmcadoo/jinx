@@ -131,6 +131,29 @@ EOF
     rm -f "$sudoers_tmp"
 }
 
+# Create the /srv tree, Caddy config dirs, log dir, and TLS material dir.
+# Apex landing page gets a placeholder until the real index.html is deployed.
+configure_filesystem() {
+    log "Creating /srv and Caddy directories"
+    install -d -m 0755 -o "$LINUX_USER" -g "$LINUX_USER" "$SRV_ROOT"
+    install -d -m 0755 -o "$LINUX_USER" -g "$LINUX_USER" "${SRV_ROOT}/_apex"
+
+    install -d -m 0755 -o root -g root /etc/caddy/sites
+    install -d -m 0750 -o root -g caddy /etc/ssl/jinx
+    install -d -m 0755 -o caddy -g caddy /var/log/caddy
+
+    if [[ ! -f "${SRV_ROOT}/_apex/index.html" ]]; then
+        log "Installing placeholder apex index.html"
+        cat > "${SRV_ROOT}/_apex/index.html" <<'EOF'
+<!doctype html>
+<title>Jinx</title>
+<h1>Jinx is up.</h1>
+<p>Projects will appear here.</p>
+EOF
+        chown "$LINUX_USER:$LINUX_USER" "${SRV_ROOT}/_apex/index.html"
+    fi
+}
+
 # --- Main ---
 main() {
     require_root
@@ -141,6 +164,7 @@ main() {
     configure_unattended_upgrades
     configure_user
     configure_sshd_and_sudo
+    configure_filesystem
     log "Bootstrap complete"
 }
 
