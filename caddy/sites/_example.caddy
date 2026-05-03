@@ -1,0 +1,28 @@
+# Template for adding a new project. Copy to <project>.caddy and edit.
+# Filename leading underscore prevents Caddy from loading it (the import glob
+# in /etc/caddy/Caddyfile is sites/*.caddy; on the server, do NOT scp this file).
+#
+# After installing the cleaned-up copy: sudo systemctl reload caddy
+#
+# Pattern:
+#   - <project>.jinx.generalproducts.io is the only public surface.
+#   - All processes listen on 127.0.0.1 only; ports per /Users/aj/.../jinx/PORTS.md.
+#   - /api/* paths route to the API process; everything else to the web frontend.
+#     Single-process projects can omit the /api block.
+
+example.jinx.generalproducts.io {
+    tls /etc/ssl/jinx/cert.pem /etc/ssl/jinx/key.pem
+
+    handle /api/* {
+        reverse_proxy localhost:3100
+    }
+
+    handle {
+        reverse_proxy localhost:3000
+    }
+
+    log {
+        output file /var/log/caddy/example.log
+        format json
+    }
+}
