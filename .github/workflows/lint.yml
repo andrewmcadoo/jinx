@@ -30,13 +30,21 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
           sudo apt-get update -qq
           sudo apt-get install -y caddy
-      - name: Pre-create log dirs Caddy expects to open
-        # `caddy validate` instantiates writers, so log paths must exist.
-        # In production these are created by bootstrap.sh; in CI we mkdir
-        # them ourselves so syntax validation can complete.
+      - name: Pre-create paths Caddy validate expects on disk
+        # `caddy validate` instantiates writers AND loads TLS material — it's
+        # not a pure syntax check. In production these paths are populated by
+        # bootstrap.sh + scp from the operator's laptop; in CI we synthesize
+        # them so syntax + adapter validation can complete.
         run: |
           sudo install -d -m 0755 /var/log/caddy
           sudo chown "$(id -un):$(id -gn)" /var/log/caddy
+          sudo install -d -m 0755 /etc/ssl/jinx
+          sudo openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout /etc/ssl/jinx/key.pem \
+            -out    /etc/ssl/jinx/cert.pem \
+            -subj   "/CN=ci-fake.invalid"
+          sudo chmod 0644 /etc/ssl/jinx/cert.pem
+          sudo chmod 0644 /etc/ssl/jinx/key.pem
       - name: Validate Caddyfile
         run: caddy validate --config caddy/Caddyfile
 
