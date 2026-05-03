@@ -154,6 +154,30 @@ EOF
     fi
 }
 
+# Print the post-bootstrap manual checklist. Bootstrap intentionally does NOT
+# install the Caddy config or the Origin Cert — those land via scp from the
+# operator's laptop after first SSH (see spec §6.2 launch procedure).
+print_manual_steps() {
+    cat <<EOF | tee -a "$LOG_FILE"
+
+==============================================================
+Bootstrap finished. Remaining manual steps (from your laptop):
+
+  1. scp caddy/Caddyfile andrew@<jinx-ip>:/tmp/
+     scp caddy/sites/00-apex.caddy andrew@<jinx-ip>:/tmp/
+     ssh jinx 'sudo install -m 0644 -o root -g root /tmp/Caddyfile /etc/caddy/Caddyfile
+               sudo install -m 0644 -o root -g root /tmp/00-apex.caddy /etc/caddy/sites/00-apex.caddy
+               rm /tmp/Caddyfile /tmp/00-apex.caddy'
+  2. scp apex/index.html andrew@<jinx-ip>:/tmp/
+     ssh jinx 'sudo install -m 0644 -o andrew -g andrew /tmp/index.html /srv/_apex/index.html'
+  3. Generate Cloudflare Origin Cert; scp cert.pem + key.pem; install at
+     /etc/ssl/jinx/ with cert 0644 root:caddy, key 0640 root:caddy.
+  4. ssh jinx 'sudo systemctl enable --now caddy && sudo systemctl reload caddy'
+  5. curl -I https://jinx.generalproducts.io   # expect 200
+==============================================================
+EOF
+}
+
 # --- Main ---
 main() {
     require_root
@@ -165,6 +189,7 @@ main() {
     configure_user
     configure_sshd_and_sudo
     configure_filesystem
+    print_manual_steps
     log "Bootstrap complete"
 }
 
