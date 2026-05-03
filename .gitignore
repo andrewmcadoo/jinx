@@ -1,3 +1,13 @@
 .DS_Store
 *.swp
 *.swo
+
+# Defensive: never commit TLS material or environment files. Origin Certs and
+# private keys live at ~/Downloads/ during cert rotation per RUNBOOK; if anyone
+# copies them into the repo for testing, this guard catches it.
+*.pem
+*.key
+*.crt
+.env
+.env.*
+!.env.example
