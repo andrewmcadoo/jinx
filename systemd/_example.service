@@ -1,0 +1,40 @@
+# Template for a project process. Copy to <project>-<role>.service and edit.
+# Install: sudo install -m 0644 -o root -g root <project>-<role>.service /etc/systemd/system/
+#          sudo systemctl daemon-reload
+#          sudo systemctl enable --now <project>-<role>
+#
+# The unit assumes:
+#   - The deploy.sh script has already created /srv/<project>/current as a
+#     symlink to a release dir.
+#   - Secrets live in /srv/<project>/shared/.env.production (EnvironmentFile).
+#   - The process listens on 127.0.0.1:<port> per PORTS.md.
+
+[Unit]
+Description=example-web (template — DO NOT install as-is)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=andrew
+Group=andrew
+WorkingDirectory=/srv/example/current
+EnvironmentFile=/srv/example/shared/.env.production
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=2s
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/example/shared
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target
