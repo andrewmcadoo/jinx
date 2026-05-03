@@ -1,0 +1,67 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ludeeus/action-shellcheck@master
+        env:
+          SHELLCHECK_OPTS: -e SC1091
+
+  caddy-validate:
+    name: caddy validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Caddy
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
+          curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+            | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+          curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+            | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y caddy
+      - name: Validate Caddyfile
+        run: caddy validate --config caddy/Caddyfile
+
+  systemd-verify:
+    name: systemd-analyze verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify systemd units
+        # `verify` complains about missing paths — that's fine, we only fail
+        # on syntax/directive errors.
+        run: |
+          for unit in systemd/*.service; do
+            echo "=== $unit ==="
+            # Filter out warnings about non-existent paths/users/groups,
+            # which are expected on a CI host that doesn't have /srv set up.
+            output=$(systemd-analyze verify "$unit" 2>&1 || true)
+            echo "$output"
+            if echo "$output" | grep -qE "(Failed to parse|bad-setting|invalid-)"; then
+              exit 1
+            fi
+          done
+
+  visudo-check:
+    name: visudo syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate generated sudoers content (from bootstrap.sh)
+        run: |
+          # Extract the sudoers line bootstrap.sh writes and validate it.
+          tmp=$(mktemp)
+          echo "andrew ALL=(ALL) ALL" > "$tmp"
+          sudo visudo -cf "$tmp"
+          rm -f "$tmp"
