@@ -27,11 +27,27 @@ require_root() {
     fi
 }
 
+# Retry a command up to 3 times with 5s sleep between attempts.
+# Used to wrap network-dependent calls (apt-get update, curl) so transient
+# failures during cloud-init don't brick the bootstrap.
+retry() {
+    local attempt
+    for attempt in 1 2 3; do
+        if "$@"; then
+            return 0
+        fi
+        log "Command failed (attempt $attempt/3): $*"
+        sleep 5
+    done
+    log "ERROR: command failed after 3 attempts: $*"
+    return 1
+}
+
 # Install OS packages and Caddy from the official Cloudsmith apt repo.
 # Idempotent: apt-get install --no-upgrade is a no-op if already installed.
 install_packages() {
     log "Updating apt cache"
-    DEBIAN_FRONTEND=noninteractive apt-get update -qq
+    retry env DEBIAN_FRONTEND=noninteractive apt-get update -qq
 
     log "Installing baseline packages"
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -43,7 +59,7 @@ install_packages() {
             | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
         curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
             | tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
-        DEBIAN_FRONTEND=noninteractive apt-get update -qq
+        retry env DEBIAN_FRONTEND=noninteractive apt-get update -qq
         DEBIAN_FRONTEND=noninteractive apt-get install -y caddy
     else
         log "Caddy already installed: $(caddy version | head -1)"
@@ -86,6 +102,9 @@ configure_user() {
     if ! id "$LINUX_USER" >/dev/null 2>&1; then
         useradd --create-home --shell /bin/bash --groups sudo "$LINUX_USER"
     fi
+    # Re-assert sudo group membership on every run — the if-block above only
+    # fires on first creation.
+    usermod -aG sudo "$LINUX_USER"
 
     local ssh_dir="/home/${LINUX_USER}/.ssh"
     install -d -m 0700 -o "$LINUX_USER" -g "$LINUX_USER" "$ssh_dir"
@@ -94,9 +113,16 @@ configure_user() {
     local keys_url="https://github.com/${GITHUB_HANDLE}.keys"
     local tmp_keys
     tmp_keys=$(mktemp)
-    curl -fsSL "$keys_url" -o "$tmp_keys"
+    local attempt
+    for attempt in 1 2 3; do
+        if curl -fsSL --max-time 15 "$keys_url" -o "$tmp_keys" && [[ -s "$tmp_keys" ]]; then
+            break
+        fi
+        log "GitHub key fetch attempt $attempt failed; sleeping 5s"
+        sleep 5
+    done
     if [[ ! -s "$tmp_keys" ]]; then
-        log "ERROR: $keys_url returned no keys"
+        log "ERROR: $keys_url returned no keys after 3 attempts"
         rm -f "$tmp_keys"
         exit 1
     fi
