@@ -168,6 +168,17 @@ configure_filesystem() {
     install -d -m 0750 -o root -g caddy /etc/ssl/jinx
     install -d -m 0755 -o caddy -g caddy /var/log/caddy
 
+    # Pre-create per-site Caddy log files with caddy ownership (mim-lp4).
+    # If we don't, the apt postinst race creates them root:root mode 0600
+    # the first time Caddy starts, and subsequent reloads as the caddy
+    # user fail with `open …: permission denied`. Guarded with `! -f` so
+    # snapshot-restore re-runs do not truncate accumulated logs.
+    for f in caddy.log apex.log; do
+        if [[ ! -f "/var/log/caddy/${f}" ]]; then
+            install -m 0644 -o caddy -g caddy /dev/null "/var/log/caddy/${f}"
+        fi
+    done
+
     if [[ ! -f "${SRV_ROOT}/_apex/index.html" ]]; then
         log "Installing placeholder apex index.html"
         cat > "${SRV_ROOT}/_apex/index.html" <<'EOF'
