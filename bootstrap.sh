@@ -8,6 +8,10 @@
 # Spec: docs/superpowers/specs/2026-05-03-jinx-scratch-box-design.md
 
 set -euo pipefail
+# Default file mode 0644, default dir mode 0755. Cloud-init sometimes runs
+# us with umask 0077, which would create the bootstrap log world-unreadable
+# and break later commands that pipe through `tee -a`. Force a sane default.
+umask 022
 
 # --- Configuration ---
 GITHUB_HANDLE="andrewmcadoo"
@@ -43,12 +47,31 @@ retry() {
     return 1
 }
 
+# Validate that a file looks like a GitHub-served authorized_keys list:
+# every non-blank line begins with a known SSH public-key algorithm. A
+# defensive check against GitHub serving an HTML error page (CDN incidents,
+# rate-limit pages) instead of the keys file.
+validate_ssh_keys_file() {
+    local file="$1"
+    [[ -s "$file" ]] || return 1
+    # `grep -qvE pattern` exits 0 if any line FAILS to match (i.e. is bad);
+    # invert that with !.
+    if grep -vE '^(ssh-rsa|ssh-ed25519|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com)( |$)' "$file" \
+         | grep -qE '\S'; then
+        return 1
+    fi
+    return 0
+}
+
 # Install OS packages and Caddy from the official Cloudsmith apt repo.
 # Idempotent: apt-get install --no-upgrade is a no-op if already installed.
 install_packages() {
     log "Updating apt cache"
     retry env DEBIAN_FRONTEND=noninteractive apt-get update -qq
 
+    # gnupg is required for `gpg --dearmor` below when adding the Caddy
+    # apt repo; install it here as part of the baseline so the Caddy block
+    # doesn't have to think about ordering.
     log "Installing baseline packages"
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         ca-certificates curl gnupg ufw unattended-upgrades
@@ -59,10 +82,18 @@ install_packages() {
             | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
         curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
             | tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
+        # Second `apt-get update` is required: the call above only refreshed
+        # cache for repos known at that time; Caddy's repo was added after.
         retry env DEBIAN_FRONTEND=noninteractive apt-get update -qq
         DEBIAN_FRONTEND=noninteractive apt-get install -y caddy
     else
-        log "Caddy already installed: $(caddy version | head -1)"
+        # `caddy version` writes to a pipe; `head -1` closes early and the
+        # process can fail with SIGPIPE under `set -o pipefail`. Capture
+        # stderr -> /dev/null and read the first line via parameter
+        # expansion to keep the failure mode contained.
+        local caddy_v
+        caddy_v=$(caddy version 2>/dev/null) || caddy_v="(unknown)"
+        log "Caddy already installed: ${caddy_v%%$'\n'*}"
     fi
 }
 
@@ -115,14 +146,15 @@ configure_user() {
     tmp_keys=$(mktemp)
     local attempt
     for attempt in 1 2 3; do
-        if curl -fsSL --max-time 15 "$keys_url" -o "$tmp_keys" && [[ -s "$tmp_keys" ]]; then
+        if curl -fsSL --max-time 15 "$keys_url" -o "$tmp_keys" \
+            && validate_ssh_keys_file "$tmp_keys"; then
             break
         fi
         log "GitHub key fetch attempt $attempt failed; sleeping 5s"
         sleep 5
     done
-    if [[ ! -s "$tmp_keys" ]]; then
-        log "ERROR: $keys_url returned no keys after 3 attempts"
+    if ! validate_ssh_keys_file "$tmp_keys"; then
+        log "ERROR: $keys_url returned no valid keys after 3 attempts"
         rm -f "$tmp_keys"
         exit 1
     fi
@@ -135,6 +167,9 @@ configure_user() {
 # install (sshd -t / visudo -cf) so we never lock ourselves out.
 configure_sshd_and_sudo() {
     log "Configuring sshd hardening"
+    # Mirror of sshd/90-jinx.conf in the repo. Keep both in sync — bootstrap
+    # runs from cloud-init user-data and can't read the repo, so duplication
+    # is by design. AllowUsers encodes the single-user invariant (spec §4).
     cat > /etc/ssh/sshd_config.d/90-jinx.conf <<'EOF'
 # Jinx hardening — see spec §4.2.
 PasswordAuthentication no
@@ -142,6 +177,7 @@ PermitRootLogin no
 AuthenticationMethods publickey
 ChallengeResponseAuthentication no
 KbdInteractiveAuthentication no
+AllowUsers andrew
 EOF
 
     # Validate before reload — sshd refuses to start with a bad config.
@@ -149,6 +185,10 @@ EOF
     systemctl reload ssh
 
     log "Configuring sudoers for $LINUX_USER"
+    # Mirror of sudoers/00-andrew in the repo (single source of truth). The
+    # CI visudo-check job diffs this heredoc against that file to catch drift.
+    # Bootstrap runs from cloud-init user-data and can't read the repo, so
+    # the duplication is by design — keep the body identical.
     local sudoers_tmp
     sudoers_tmp=$(mktemp)
     printf '%s ALL=(ALL) ALL\n' "$LINUX_USER" > "$sudoers_tmp"
@@ -181,13 +221,19 @@ configure_filesystem() {
 
     if [[ ! -f "${SRV_ROOT}/_apex/index.html" ]]; then
         log "Installing placeholder apex index.html"
-        cat > "${SRV_ROOT}/_apex/index.html" <<'EOF'
+        local apex_tmp
+        apex_tmp=$(mktemp)
+        cat > "$apex_tmp" <<'EOF'
 <!doctype html>
 <title>Jinx</title>
 <h1>Jinx is up.</h1>
 <p>Projects will appear here.</p>
 EOF
-        chown "$LINUX_USER:$LINUX_USER" "${SRV_ROOT}/_apex/index.html"
+        # install(1) sets owner, group and mode atomically; preferable to
+        # cat > … followed by chown/chmod.
+        install -m 0644 -o "$LINUX_USER" -g "$LINUX_USER" \
+            "$apex_tmp" "${SRV_ROOT}/_apex/index.html"
+        rm -f "$apex_tmp"
     fi
 }
 

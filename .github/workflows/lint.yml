@@ -11,7 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ludeeus/action-shellcheck@master
+      # Pinned to v2.0.0 SHA (not @master) to neutralise supply-chain risk
+      # if the upstream branch is ever hijacked. Bump the SHA when reviewing
+      # https://github.com/ludeeus/action-shellcheck/releases.
+      - uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # v2.0.0
         env:
           SHELLCHECK_OPTS: -e SC1091
 
@@ -73,10 +76,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate generated sudoers content (from bootstrap.sh)
+      - name: Validate sudoers/00-andrew (single source of truth)
+        # The repo file sudoers/00-andrew is the canonical sudoers grant;
+        # bootstrap.sh inlines a heredoc with the same body. Validating the
+        # repo file directly means CI fails fast if anyone edits the canonical
+        # file with bad syntax — and removes the previous duplication where
+        # this job hardcoded "andrew ALL=(ALL) ALL".
+        run: sudo visudo -cf sudoers/00-andrew
+      - name: Verify bootstrap.sh inline copy matches the repo file
+        # Defends against drift between the two copies. Extracts the heredoc
+        # body bootstrap.sh writes to /etc/sudoers.d/00-andrew and diffs it
+        # against the canonical file (ignoring comment-only lines so the
+        # repo file can carry its header).
         run: |
-          # Extract the sudoers line bootstrap.sh writes and validate it.
           tmp=$(mktemp)
-          echo "andrew ALL=(ALL) ALL" > "$tmp"
-          sudo visudo -cf "$tmp"
-          rm -f "$tmp"
+          # Pull the line bootstrap.sh writes via printf: it's the only
+          # `printf '%s ALL=(ALL) ALL\n'` in the file.
+          grep -E "^[[:space:]]*printf '%s ALL=" bootstrap.sh \
+            | sed -E "s/^[[:space:]]*printf '%s ALL=\(ALL\) ALL.*$/\${LINUX_USER} ALL=(ALL) ALL/" \
+            | sed -E 's/\$\{LINUX_USER\}/andrew/' \
+            > "$tmp"
+          # Strip comments + blank lines from the canonical file for the diff.
+          grep -vE '^[[:space:]]*(#|$)' sudoers/00-andrew > "${tmp}.canonical"
+          diff -u "${tmp}.canonical" "$tmp"
+          rm -f "$tmp" "${tmp}.canonical"

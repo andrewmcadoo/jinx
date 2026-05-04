@@ -321,8 +321,9 @@ half added to GitHub at https://github.com/settings/keys (so
 
 ## 5. Hardening
 
-- **`ufw`** enabled, default deny inbound, allow `22/tcp`, `80/tcp`,
-  `443/tcp`. Mirrors the Lightsail firewall; defense in depth.
+- **`ufw`** enabled, default deny inbound, allow `22/tcp` and `443/tcp`.
+  Port 80 intentionally closed — see §3.2. Mirrors the Lightsail firewall;
+  defense in depth.
 - **`unattended-upgrades`** installed and enabled. Security patches applied
   nightly; reboot scheduled at 04:00 UTC if a kernel update requires it.
 - **`fail2ban`** **not** installed. Justification: SSH is key-only (no
@@ -348,7 +349,7 @@ jinx/
     Caddyfile                            # base config that imports sites/
     sites/
       00-apex.caddy                      # apex landing page
-      _example.caddy                     # template for new projects
+      _example.caddy.tmpl                # template for new projects (non-matching ext)
   apex/
     index.html                           # static landing page (lists projects)
   systemd/
@@ -388,9 +389,14 @@ on first boot, re-runnable for recovery. Responsibilities:
    `chown andrew:andrew /srv`
 10. Drop in placeholder `/srv/_apex/index.html` ("Jinx is up. Projects will
     appear here.")
-11. Install base `Caddyfile` and `sites/00-apex.caddy`
-12. Print remaining manual steps (install Origin Cert at `/etc/ssl/jinx/`,
+11. Print remaining manual steps (scp base `Caddyfile` and
+    `sites/00-apex.caddy`, install Origin Cert at `/etc/ssl/jinx/`,
     enable+start caddy)
+
+The script does **not** install the base `Caddyfile` or `sites/00-apex.caddy`.
+Those land via `scp` from the operator's laptop after first SSH (see §6.2),
+which keeps `bootstrap.sh` self-contained and avoids embedding repo content
+in the cloud-init payload.
 
 The script does **not** install the Origin Certificate. That happens manually
 after launch (§7 step 5).

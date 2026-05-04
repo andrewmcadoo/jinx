@@ -13,8 +13,10 @@ External traffic always arrives via Caddy on `:443`.
 Allocate by inserting into the table below in ascending order. Do not reuse
 ports across projects — even if a project is paused, leave its row.
 
+`Status` values: `reserved` | `active` | `paused` | `retired`.
+
 ## Allocations
 
 | Project   | Role   | Port | Status   | Notes                  |
 | --------- | ------ | ---- | -------- | ---------------------- |
-| _example_ | _web_  | 3000 | reserved | Template; never bound. |
+| _example_ | _web_  | 3099 | reserved | Template; never bound. Sentinel out of normal allocation flow — avoids collision with the Next.js dev-server default of `:3000`. |

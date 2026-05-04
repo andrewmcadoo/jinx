@@ -1,6 +1,8 @@
 # Template for adding a new project. Copy to <project>.caddy and edit.
-# Filename leading underscore prevents Caddy from loading it (the import glob
-# in /etc/caddy/Caddyfile is sites/*.caddy; on the server, do NOT scp this file).
+# Filename ends in .tmpl (not .caddy) so it cannot match the sites/*.caddy
+# import glob in /etc/caddy/Caddyfile — even if accidentally scp'd to the
+# server. The leading underscore is convention only; the extension is the
+# real safeguard.
 #
 # After installing the cleaned-up copy: sudo systemctl reload caddy
 #
@@ -14,11 +16,11 @@ example.jinx.generalproducts.io {
     tls /etc/ssl/jinx/cert.pem /etc/ssl/jinx/key.pem
 
     handle /api/* {
-        reverse_proxy 127.0.0.1:3100
+        reverse_proxy 127.0.0.1:3199
     }
 
     handle {
-        reverse_proxy 127.0.0.1:3000
+        reverse_proxy 127.0.0.1:3099
     }
 
     log {

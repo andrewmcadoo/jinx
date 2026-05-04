@@ -1,0 +1,9 @@
+# Jinx base sudoers entry — see spec §4.3.
+#
+# Single source of truth for the andrew user's sudo grant. Mirrored by
+# bootstrap.sh's inline heredoc (cloud-init can't read this file at boot),
+# and validated unmodified by .github/workflows/lint.yml's visudo-check job.
+#
+# Per-project NOPASSWD restart entries live in /etc/sudoers.d/<project>
+# (see RUNBOOK §"Adding a project" step 8) — keep those out of this file.
+andrew ALL=(ALL) ALL

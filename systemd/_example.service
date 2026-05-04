@@ -35,6 +35,24 @@ ReadWritePaths=/srv/example/shared
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
+# Restrict the address families the process can use. AF_UNIX for socket
+# activation / local IPC, AF_INET + AF_INET6 for HTTP. Drops AF_NETLINK,
+# AF_PACKET, AF_BLUETOOTH, etc. — none of which a web/api process needs.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# Prevent setting personality(2) — blocks emulating older kernel ABIs
+# (32-bit on 64-bit, etc.) which is a common exploit primitive.
+LockPersonality=true
+# Disallow SCHED_FIFO / SCHED_RR. Realtime scheduling is a known DoS vector
+# (a buggy or malicious process can monopolise a CPU).
+RestrictRealtime=true
+# Forbid creation of suid/sgid binaries from inside the unit's writable paths.
+RestrictSUIDSGID=true
+# Intentionally NOT set:
+#   MemoryDenyWriteExecute=true       — breaks the V8 / Node JIT
+#   SystemCallFilter=...              — too tight for diverse Node/Python deps
+#   CapabilityBoundingSet=            — already empty by default for User=
+# Revisit MemoryDenyWriteExecute on a per-project basis if the runtime
+# tolerates a non-JIT path (e.g. pure Go/Rust binaries).
 
 [Install]
 WantedBy=multi-user.target

@@ -16,10 +16,12 @@ ssh jinx
 1. **Allocate a port.** Edit `PORTS.md`, append a row, commit.
 2. **Copy the Caddy template:**
    ```
-   cp caddy/sites/_example.caddy caddy/sites/<project>.caddy
-   # Edit hostname, ports, log filename. Remove leading-underscore confusion
-   # by NEVER copying _example.caddy to the server itself.
+   cp caddy/sites/_example.caddy.tmpl caddy/sites/<project>.caddy
+   # Edit hostname, ports, log filename.
    ```
+   The `.tmpl` suffix on the template means it cannot match the
+   `sites/*.caddy` import glob even if it's accidentally scp'd to
+   `/etc/caddy/sites/` — defense against typos.
 3. **Copy the systemd template:**
    ```
    cp systemd/_example.service systemd/<project>-<role>.service
@@ -36,17 +38,17 @@ ssh jinx
    ```
    scp caddy/sites/<project>.caddy jinx:/tmp/
    ssh jinx 'sudo install -m 0644 -o root -g root \
-             /tmp/<project>.caddy /etc/caddy/sites/<project>.caddy
-             sudo systemctl reload caddy
-             rm /tmp/<project>.caddy'
+             /tmp/<project>.caddy /etc/caddy/sites/<project>.caddy \
+             && sudo systemctl reload caddy \
+             && rm /tmp/<project>.caddy'
    ```
 7. **Install the systemd unit(s):**
    ```
    scp systemd/<project>-<role>.service jinx:/tmp/
    ssh jinx 'sudo install -m 0644 -o root -g root \
-             /tmp/<project>-<role>.service /etc/systemd/system/
-             sudo systemctl daemon-reload
-             rm /tmp/<project>-<role>.service'
+             /tmp/<project>-<role>.service /etc/systemd/system/ \
+             && sudo systemctl daemon-reload \
+             && rm /tmp/<project>-<role>.service'
    ```
    (Don't `enable --now` until after the first deploy populates `/srv/<project>/current`.)
 8. **Add NOPASSWD sudoers entry** (Jinx-side):
@@ -62,7 +64,13 @@ ssh jinx
     ssh jinx 'sudo systemctl enable --now <project>-<role>'
     ```
 11. **Smoke test:** `curl -I https://<project>.jinx.generalproducts.io`.
-12. **Update `apex/index.html`** to list the new project; redeploy (`scp` to `/srv/_apex/`).
+12. **Update `apex/index.html`** to list the new project; redeploy:
+    ```
+    scp apex/index.html jinx:/srv/_apex/index.html
+    ```
+    `/srv/_apex` is owned by `andrew:andrew` (bootstrap.sh §6.1 step 9), so
+    no sudo / `install` dance is needed for the apex page — direct `scp`
+    overwrites the placeholder in place.
 
 ## Cert rotation (Cloudflare Origin Cert)
 
@@ -80,15 +88,28 @@ Steps:
 4. `scp` and install:
    ```
    scp cert.pem key.pem jinx:/tmp/
-   ssh jinx 'sudo install -m 0644 -o root -g caddy /tmp/cert.pem /etc/ssl/jinx/cert.pem
-             sudo install -m 0640 -o root -g caddy /tmp/key.pem  /etc/ssl/jinx/key.pem
-             rm /tmp/cert.pem /tmp/key.pem
-             sudo systemctl reload caddy'
+   ssh jinx 'sudo install -m 0644 -o root -g caddy /tmp/cert.pem /etc/ssl/jinx/cert.pem \
+             && sudo install -m 0640 -o root -g caddy /tmp/key.pem  /etc/ssl/jinx/key.pem \
+             && rm /tmp/cert.pem /tmp/key.pem \
+             && sudo systemctl reload caddy'
    ```
-5. Verify:
+5. Verify the **origin** cert (not the Cloudflare edge cert).
+   `curl https://jinx.generalproducts.io` resolves to a Cloudflare edge IP
+   and inspects CF's edge cert — that won't tell you anything about the cert
+   you just installed on the box. Use `--resolve` to force curl to bypass
+   Cloudflare and hit the Lightsail static IP directly while still sending
+   SNI for `jinx.generalproducts.io`:
    ```
-   curl -vI https://jinx.generalproducts.io 2>&1 | grep -E "subject:|expire"
+   ORIGIN_IP=<jinx static IP from Lightsail console>
+   curl -vk --resolve "jinx.generalproducts.io:443:${ORIGIN_IP}" \
+        https://jinx.generalproducts.io 2>&1 \
+     | grep -E "subject:|issuer:|expire"
    ```
+   Expect `issuer: CN=Cloudflare Origin Certificate Authority` and an expiry
+   matching the cert you just generated. A Cloudflare edge cert (e.g.
+   `issuer: ...Google Trust Services...`) means you didn't bypass CF — fix
+   the resolve target. `-k` is intentional: the origin cert isn't in any
+   public trust store, so curl would otherwise fail to verify it.
 
 ## Refreshing SSH keys
 
@@ -103,6 +124,9 @@ ssh jinx 'sudo /usr/local/bin/refresh-ssh-keys'
 1. Lightsail console → Snapshots → pick most recent → "Create new instance from snapshot".
 2. Use bundle `small_3_0`, name `jinx-restored`.
 3. Detach the static IP from the old `jinx`, attach to `jinx-restored`.
+   **Expect 30s–2min of Cloudflare 521/522 errors** during this window —
+   the static IP is briefly unattached, so CF can't reach origin.
+   Tolerable for a scratch box; mention in any user-visible status post.
 4. Cloudflare DNS auto-resolves on next TTL (no change needed if static IP is reused).
 5. SSH to verify, then delete the old instance.
 
@@ -110,8 +134,15 @@ ssh jinx 'sudo /usr/local/bin/refresh-ssh-keys'
 
 If a sudoers/sshd change locks you out:
 
-1. Lightsail console → Connect → "Connect using SSH" (browser-based, uses Lightsail's
-   own credentials, bypasses your sshd hardening).
+1. Lightsail console → Connect → "Connect using SSH" (browser-based).
+   Lightsail injects its own short-lived public key into the instance's
+   authorized_keys via the Lightsail agent and then connects with the
+   matching private key — so it still goes through sshd and respects
+   `PasswordAuthentication no` / `AuthenticationMethods publickey`. What it
+   bypasses is *your* SSH key chain, not your sshd hardening.
+   **Important:** sshd has `AllowUsers andrew` set, so the default Lightsail
+   Connect username (`ubuntu`) will be refused. In the Connect dialog,
+   override the username to `andrew` before clicking connect.
 2. Fix the bad config.
 3. `sudo systemctl reload ssh`.
 
