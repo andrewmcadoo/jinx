@@ -11,3 +11,7 @@
 .env
 .env.*
 !.env.example
+
+# Build artifact: dash-safe Lightsail user-data wrapper around bootstrap.sh.
+# Regenerate with `./scripts/make-userdata.sh`. Never edit by hand.
+userdata.sh

@@ -1312,14 +1312,26 @@ Expected: all four lint jobs pass. If a job fails, fix locally, commit, push, re
 
 **Files:** none (cloud resource)
 
-- [ ] **Step 21.1: Verify the bootstrap.sh fits within Lightsail's user-data limit**
+- [ ] **Step 21.1: Generate the dash-safe user-data wrapper**
+
+Lightsail prepends its own `#!/bin/sh` SSH-CA setup to `--user-data` and runs
+the combined script via dash. `bootstrap.sh` uses bash-only syntax
+(`set -euo pipefail`, `[[ ]]`), so it must be wrapped before being passed to
+`create-instances`. The wrapper script in `scripts/make-userdata.sh` produces
+a POSIX-safe `userdata.sh` that heredocs `bootstrap.sh` to disk and execs bash.
 
 ```bash
 cd /Users/aj/Desktop/Workspace/jinx
-wc -c bootstrap.sh
+./scripts/make-userdata.sh
 ```
 
-Expected: a number under 16384 (Lightsail's user-data limit). Current size should be ~3-4KB, well under.
+Expected: prints `Generated …/userdata.sh (<N> bytes)`. The script asserts
+`<N> <= 16384` (Lightsail's user-data limit) and exits non-zero if exceeded.
+`userdata.sh` is gitignored — regenerate any time `bootstrap.sh` changes.
+
+Background: this fixes the original-launch bug where dash choked on
+`set -euo pipefail` (cloud-init reported `scripts_user RuntimeError:
+Runparts: 1 failures`). See `mim-d5i` (closed) for the full diagnosis.
 
 - [ ] **Step 21.2: Resolve the Linux 24.04 LTS blueprint ID**
 
@@ -1351,10 +1363,12 @@ aws lightsail create-instances \
   --instance-names jinx \
   --blueprint-id ubuntu_24_04 \
   --bundle-id small_3_0 \
-  --user-data file://bootstrap.sh
+  --user-data file://userdata.sh
 ```
 
-(Adjust `--blueprint-id` and `--bundle-id` if Steps 21.2/21.3 returned different exact IDs.)
+(Adjust `--blueprint-id` and `--bundle-id` if Steps 21.2/21.3 returned different exact IDs.
+**Note:** `--user-data` points at `userdata.sh`, the wrapper generated in Step 21.1
+— **not** `bootstrap.sh` directly. Passing `bootstrap.sh` triggers `mim-d5i`.)
 
 Expected: a JSON `operations` blob with status `Started`. The instance takes ~60s to boot, then bootstrap.sh runs and takes another ~3 min.
 
