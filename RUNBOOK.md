@@ -39,9 +39,20 @@ ssh jinx
    scp caddy/sites/<project>.caddy jinx:/tmp/
    ssh jinx 'sudo install -m 0644 -o root -g root \
              /tmp/<project>.caddy /etc/caddy/sites/<project>.caddy \
-             && sudo systemctl reload caddy \
+             && sudo install -m 0644 -o caddy -g caddy /dev/null \
+             /var/log/caddy/<project>.log \
+             && sudo systemctl restart caddy \
              && rm /tmp/<project>.caddy'
    ```
+   The `install … /dev/null /var/log/caddy/<project>.log` line
+   pre-creates the per-site log file with caddy ownership. Without
+   this, Caddy can't `open()` the missing file the first time it
+   tries to log a request — and even if it auto-created one, the apt
+   postinst race owns it `root:root` mode `0600` so caddy can't write
+   to it (mim-lp4 / nabu-jaau). Snapshot-restore
+   re-runs of `bootstrap.sh` auto-discover existing sites and
+   pre-create any missing log files (`bootstrap.sh` →
+   `configure_filesystem()`).
 7. **Install the systemd unit(s):**
    ```
    scp systemd/<project>-<role>.service jinx:/tmp/
@@ -91,7 +102,7 @@ Steps:
    ssh jinx 'sudo install -m 0644 -o root -g caddy /tmp/cert.pem /etc/ssl/jinx/cert.pem \
              && sudo install -m 0640 -o root -g caddy /tmp/key.pem  /etc/ssl/jinx/key.pem \
              && rm /tmp/cert.pem /tmp/key.pem \
-             && sudo systemctl reload caddy'
+             && sudo systemctl restart caddy'
    ```
 5. Verify the **origin** cert (not the Cloudflare edge cert).
    `curl https://jinx.generalproducts.io` resolves to a Cloudflare edge IP
@@ -157,4 +168,11 @@ If a sudoers/sshd change locks you out:
 | Live project logs                 | `sudo journalctl -u <project>-<role> -f`     |
 | Disk usage by project             | `sudo du -sh /srv/*`                         |
 | Caddy config validate             | `sudo caddy validate --config /etc/caddy/Caddyfile` |
-| Caddy reload (zero downtime)      | `sudo systemctl reload caddy`                |
+| Caddy apply config changes        | `sudo systemctl restart caddy` (see note below) |
+
+**Why `restart`, not `reload`:** the global Caddyfile sets `admin off`,
+which disables the localhost:2019 admin API. Caddy's `ExecReload=` runs
+`caddy reload --config …` which POSTs to that admin socket and exits
+non-zero when the socket isn't there. Use `systemctl restart caddy` for
+all config changes — brief (sub-second) outage, acceptable for jinx.
+Documented at `caddy/Caddyfile` (nabu-09jr).

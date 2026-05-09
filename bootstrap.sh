@@ -213,7 +213,26 @@ configure_filesystem() {
     # the first time Caddy starts, and subsequent reloads as the caddy
     # user fail with `open …: permission denied`. Guarded with `! -f` so
     # snapshot-restore re-runs do not truncate accumulated logs.
-    for f in caddy.log apex.log; do
+    #
+    # First-boot path: only caddy.log + apex.log are pre-created here
+    # (00-apex.caddy lands in the post-bootstrap manual steps). Each
+    # additional project pre-creates its own per-site log via RUNBOOK
+    # "Adding a project" step 6 (nabu-jaau).
+    #
+    # Snapshot-restore re-run path: /etc/caddy/sites/*.caddy already
+    # exist from the prior boot, so we auto-discover them by parsing
+    # `output file /var/log/caddy/<name>.log` directives — covers the
+    # case where logs were nuked (e.g. /var/log on a separate volume
+    # that was rebuilt) without requiring this list to be edited
+    # whenever a new project is added.
+    declare -a log_files=("caddy.log" "apex.log")
+    if compgen -G "/etc/caddy/sites/*.caddy" >/dev/null; then
+        while IFS= read -r path; do
+            log_files+=("$(basename "$path")")
+        done < <(grep -hE '^[[:space:]]*output file /var/log/caddy/[^[:space:]]+\.log' \
+                 /etc/caddy/sites/*.caddy 2>/dev/null | awk '{print $3}')
+    fi
+    for f in "${log_files[@]}"; do
         if [[ ! -f "/var/log/caddy/${f}" ]]; then
             install -m 0644 -o caddy -g caddy /dev/null "/var/log/caddy/${f}"
         fi

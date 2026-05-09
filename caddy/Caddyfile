@@ -1,4 +1,11 @@
 {
+    # admin off shuts down the localhost:2019 admin API (no graceful
+    # reload, no /metrics, no JSON config endpoint). Consequence:
+    # `systemctl reload caddy` POSTs to localhost:2019 and exits non-zero
+    # because the socket isn't there — operators must use
+    # `systemctl restart caddy` for config changes (brief sub-second
+    # outage, acceptable for jinx). RUNBOOK § "Adding a project" and
+    # the operations table both call `restart`, not `reload`. nabu-09jr.
     admin off
     # auto_https off disables both ACME issuance AND HTTP→HTTPS redirect.
     # We don't need either: certs come from Cloudflare Origin (spec §3.4),
