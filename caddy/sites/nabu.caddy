@@ -26,6 +26,34 @@ nabu.jinx.generalproducts.io {
     # `/auth/google/authorize` (200). Use `handle` + explicit
     # `uri strip_prefix /api` to strip only `/api`. (nabu repo: bd remember
     # caddy-handle-path-strip)
+
+    # OAuth callback exception — must come BEFORE the broad /api/auth/*
+    # rule (Caddy uses first-match). FastAPI-Users' callback returns
+    # `204 No Content + Set-Cookie` for the session, which (a) leaves the
+    # user on a blank page at /api/auth/google/callback?code=..., and
+    # (b) Cloudflare's WAF flags the 204+Set-Cookie+google-referer shape
+    # as anomalous and returns 503 to the browser even though Caddy and
+    # FastAPI both see a clean 204. The Next.js Route Handler at
+    # apps/web/src/app/api/auth/google/callback/route.ts exists
+    # specifically to forward to FastAPI, propagate the Set-Cookie, and
+    # 302 the user to /. Route the callback to Next so that handler
+    # runs. (nabu repo: bd remember caddy-oauth-callback-via-next)
+    handle /api/auth/google/callback {
+        # Next.js's Route Handler builds its 302 redirect Location via
+        # `new URL("/", request.url)`, but in `next start` mode behind a
+        # reverse proxy `request.url` is constructed from Next's bind
+        # address (HOSTNAME=127.0.0.1, PORT=3001), not the Host header.
+        # Even with `header_up Host {host}` Next ignores it and emits
+        # `Location: http://localhost:3001/`, which Cloudflare upgrades
+        # to `https://localhost:3001/` and the browser tries to navigate
+        # there. Rewrite the Location response header back to the public
+        # host before forwarding to the client. (nabu repo: bd remember
+        # caddy-rewrite-next-redirect-location)
+        reverse_proxy 127.0.0.1:3001 {
+            header_up Host {host}
+            header_down Location "https?://(localhost|127\.0\.0\.1):3001(.*)" "https://{host}$2"
+        }
+    }
     handle /api/auth/* {
         uri strip_prefix /api
         reverse_proxy 127.0.0.1:3101
