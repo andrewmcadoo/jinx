@@ -39,19 +39,15 @@ nabu.jinx.generalproducts.io {
     # 302 the user to /. Route the callback to Next so that handler
     # runs. (nabu repo: bd remember caddy-oauth-callback-via-next)
     handle /api/auth/google/callback {
-        # Next.js's Route Handler builds its 302 redirect Location via
-        # `new URL("/", request.url)`, but in `next start` mode behind a
-        # reverse proxy `request.url` is constructed from Next's bind
-        # address (HOSTNAME=127.0.0.1, PORT=3001), not the Host header.
-        # Even with `header_up Host {host}` Next ignores it and emits
-        # `Location: http://localhost:3001/`, which Cloudflare upgrades
-        # to `https://localhost:3001/` and the browser tries to navigate
-        # there. Rewrite the Location response header back to the public
-        # host before forwarding to the client. (nabu repo: bd remember
-        # caddy-rewrite-next-redirect-location)
+        # The Next.js Route Handler at apps/web/src/app/api/auth/google/
+        # callback/route.ts now uses X-Forwarded-Host / X-Forwarded-Proto
+        # to build the redirect Location (nabu-frk5), so Caddy no longer
+        # needs `header_down Location` rewriting. `header_up Host {host}`
+        # is still set so any future absolute-URL construction in Next
+        # also picks up the public host. Caddy populates X-Forwarded-Host
+        # automatically.
         reverse_proxy 127.0.0.1:3001 {
             header_up Host {host}
-            header_down Location "https?://(localhost|127\.0\.0\.1):3001(.*)" "https://{host}$2"
         }
     }
     handle /api/auth/* {
