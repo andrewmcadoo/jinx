@@ -53,6 +53,15 @@ ssh jinx
    re-runs of `bootstrap.sh` auto-discover existing sites and
    pre-create any missing log files (`bootstrap.sh` →
    `configure_filesystem()`).
+
+   `restart` (not `reload`) is intentional: this box's Caddyfile
+   disables the admin API (Caddy's `caddy reload` POSTs the new
+   config to `127.0.0.1:2019`, which is not bound here for security).
+   `systemctl reload caddy` exits non-zero with
+   `dial tcp 127.0.0.1:2019: connect: connection refused` and leaves
+   the running instance untouched — so the new site silently fails to
+   take effect. `restart` triggers a brief (~1–2s) drop on all sites,
+   which is acceptable on the scratch tier (nabu-6lsn).
 7. **Install the systemd unit(s):**
    ```
    scp systemd/<project>-<role>.service jinx:/tmp/
