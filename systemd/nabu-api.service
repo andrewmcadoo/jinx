@@ -38,7 +38,10 @@ ReadWritePaths=/srv/nabu/shared
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# AF_NETLINK kept symmetric with nabu-web.service. Python+asyncio
+# doesn't fail today, but uvloop/anyio paths can call into getifaddrs()
+# transitively, and divergence between the two units is a footgun.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 LockPersonality=true
 RestrictRealtime=true
 RestrictSUIDSGID=true

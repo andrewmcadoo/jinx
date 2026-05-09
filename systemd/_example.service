@@ -36,9 +36,11 @@ ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
 # Restrict the address families the process can use. AF_UNIX for socket
-# activation / local IPC, AF_INET + AF_INET6 for HTTP. Drops AF_NETLINK,
-# AF_PACKET, AF_BLUETOOTH, etc. — none of which a web/api process needs.
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# activation / local IPC, AF_INET + AF_INET6 for HTTP, AF_NETLINK for
+# getifaddrs() — Bun/Node/asyncio runtimes call it on startup to
+# enumerate interfaces and crash on EAFNOSUPPORT if it's missing
+# (nabu-ckv4). Drops AF_PACKET, AF_BLUETOOTH, etc.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 # Prevent setting personality(2) — blocks emulating older kernel ABIs
 # (32-bit on 64-bit, etc.) which is a common exploit primitive.
 LockPersonality=true

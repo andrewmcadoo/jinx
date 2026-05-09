@@ -31,7 +31,11 @@ ReadWritePaths=/srv/nabu/shared
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# AF_NETLINK is required by getifaddrs() — Next.js / Bun call it during
+# startup to enumerate network interfaces. Without it, bun terminates
+# with `Unhandled Rejection: getifaddrs returned EAFNOSUPPORT (97)` and
+# the service stops listening on PORT — the public URL then 502s.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 LockPersonality=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
