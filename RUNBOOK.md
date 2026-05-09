@@ -83,6 +83,38 @@ ssh jinx
     no sudo / `install` dance is needed for the apex page — direct `scp`
     overwrites the placeholder in place.
 
+## Developer convenience: blanket NOPASSWD
+
+`sudoers/01-andrew-nopasswd` is an **opt-in** override that grants
+`andrew` blanket `NOPASSWD: ALL`. `bootstrap.sh` does NOT install it —
+the default jinx posture is `sudoers/00-andrew` (password-required
+`ALL=(ALL) ALL`) plus per-project scoped NOPASSWD entries (see step 8
+of "Adding a project" and `sudoers/nabu` for the pattern).
+
+**Trade-off:** with this file installed, an SSH key compromise on
+`andrew` is a silent root compromise — no further authentication
+challenges, no password prompt. The scoped per-project pattern keeps
+unattended deploys working without giving up the password gate on
+ad-hoc operator commands. Install this file only when bootstrapping
+or iterating on box config; remove it once that work is done.
+
+```
+# Install
+scp sudoers/01-andrew-nopasswd jinx:/tmp/
+ssh jinx 'sudo install -m 0440 -o root -g root \
+            /tmp/01-andrew-nopasswd /etc/sudoers.d/01-andrew-nopasswd \
+          && sudo visudo -cf /etc/sudoers.d/01-andrew-nopasswd \
+          && rm /tmp/01-andrew-nopasswd'
+
+# Remove
+ssh jinx 'sudo rm /etc/sudoers.d/01-andrew-nopasswd'
+```
+
+The `01-` prefix matters: `/etc/sudoers.d/` files are processed in
+lexical order, so this file's `NOPASSWD: ALL` overrides the
+password-required directive from `00-andrew`. Removing the file
+restores the password gate on the next `sudo` invocation.
+
 ## Cert rotation (Cloudflare Origin Cert)
 
 The current cert is valid for 15 years. Rotate when:

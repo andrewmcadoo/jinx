@@ -1,0 +1,29 @@
+# OPT-IN: blanket NOPASSWD sudo for andrew. NOT installed by bootstrap.sh.
+#
+# Trade-off: with this file installed, anyone who SSHes as andrew gets
+# silent root with no further authentication. The default jinx posture
+# (sudoers/00-andrew = ALL=(ALL) ALL, scoped NOPASSWD per project via
+# sudoers/<project> — see sudoers/nabu for the canonical pattern) keeps
+# password-required sudo for ad-hoc commands and grants NOPASSWD only
+# for the specific systemctl invocations that deploy scripts need to run
+# unattended.
+#
+# Use this file when you're iterating quickly on box configuration
+# during a project bootstrap and the password prompts get in the way.
+# Remove it when you're done. RUNBOOK.md § "Developer convenience:
+# blanket NOPASSWD" has the operational details.
+#
+# Lexical-order note: /etc/sudoers.d/ files are processed in sorted
+# order. The 01- prefix puts this file after 00-andrew, so the
+# NOPASSWD: ALL grant takes precedence over the password-required
+# directive in 00-andrew. Snapshot-restore re-applying both files is
+# safe — sudoers semantics are deterministic on order.
+#
+# Install:  sudo install -m 0440 -o root -g root \
+#             01-andrew-nopasswd /etc/sudoers.d/01-andrew-nopasswd
+# Validate: sudo visudo -cf /etc/sudoers.d/01-andrew-nopasswd
+# Remove:   sudo rm /etc/sudoers.d/01-andrew-nopasswd
+#
+# CI's visudo-check job (.github/workflows/lint.yml) validates this
+# file's syntax independently of whether it is ever installed.
+andrew ALL=(ALL) NOPASSWD: ALL
