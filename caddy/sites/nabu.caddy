@@ -19,7 +19,15 @@ nabu.jinx.generalproducts.io {
     # FastAPI mounts auth at /auth/* (no /api prefix) and the versioned
     # API at /api/v1/* (with prefix). Caddy strips /api for auth and
     # preserves it for everything else.
-    handle_path /api/auth/* {
+    #
+    # NOTE: do NOT use `handle_path /api/auth/*` here. handle_path strips
+    # the *full matched prefix* (`/api/auth/`), so `/api/auth/google/authorize`
+    # would arrive at FastAPI as `/google/authorize` (404) instead of
+    # `/auth/google/authorize` (200). Use `handle` + explicit
+    # `uri strip_prefix /api` to strip only `/api`. (nabu repo: bd remember
+    # caddy-handle-path-strip)
+    handle /api/auth/* {
+        uri strip_prefix /api
         reverse_proxy 127.0.0.1:3101
     }
     handle /api/v1/* {
