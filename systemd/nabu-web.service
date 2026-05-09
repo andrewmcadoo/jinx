@@ -1,0 +1,43 @@
+# nabu-web — Next.js 15 frontend for nabu (scratch tier).
+# Install: sudo install -m 0644 -o root -g root nabu-web.service /etc/systemd/system/
+#          sudo systemctl daemon-reload
+# DO NOT enable until /srv/nabu/current exists (see JINX.md "Don't").
+
+[Unit]
+Description=nabu-web (Next.js 15 frontend)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=andrew
+Group=andrew
+# Monorepo: web app lives under apps/web. `next start` reads PORT and
+# HOSTNAME from the environment and serves from .next/ relative to cwd.
+WorkingDirectory=/srv/nabu/current/apps/web
+EnvironmentFile=/srv/nabu/shared/.env.production
+Environment=PORT=3001
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/home/andrew/.bun/bin/bun start
+Restart=on-failure
+RestartSec=2s
+
+# Hardening — mirrors systemd/_example.service.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/nabu/shared
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+# Intentionally NOT set:
+#   MemoryDenyWriteExecute=true       — breaks the V8 JIT used by Next/Bun
+#   SystemCallFilter=...              — too tight for Node/Bun deps
+
+[Install]
+WantedBy=multi-user.target

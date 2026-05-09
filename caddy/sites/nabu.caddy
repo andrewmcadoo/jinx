@@ -1,0 +1,45 @@
+nabu.jinx.generalproducts.io {
+    tls /etc/ssl/jinx/cert.pem /etc/ssl/jinx/key.pem
+
+    # CRITICAL — DO NOT REMOVE.
+    # Strip any client-supplied X-Forwarded-For BEFORE reverse_proxy.
+    # Caddy's reverse_proxy *appends* the immediate-peer IP to whatever
+    # XFF the client sent (it does NOT strip a client-supplied XFF), so
+    # without this directive a forged "X-Forwarded-For: 1.2.3.4" arrives
+    # at nabu-api as "1.2.3.4, <real>".
+    #
+    # apps/api/app/lib/rate_limit.py:23-28 reads `xff.split(",")[0]`
+    # (the LEFTMOST entry) when NABU_TRUST_PROXY=true, so any client
+    # could spoof their per-IP rate-limit bucket. Stripping inbound XFF
+    # makes the leftmost entry always be Caddy's appended real-peer IP.
+    # See nabu repo: bd show nabu-chl7, bd show nabu-77bk.
+    request_header -X-Forwarded-For
+
+    # Path routing — must mirror apps/web/next.config.ts:34-39 exactly.
+    # FastAPI mounts auth at /auth/* (no /api prefix) and the versioned
+    # API at /api/v1/* (with prefix). Caddy strips /api for auth and
+    # preserves it for everything else.
+    handle_path /api/auth/* {
+        reverse_proxy 127.0.0.1:3101
+    }
+    handle /api/v1/* {
+        reverse_proxy 127.0.0.1:3101
+    }
+    # /api/health: public liveness probe added in nabu commit 7833c14
+    # specifically so Caddy can forward it without a prefix special-case.
+    handle /api/health {
+        reverse_proxy 127.0.0.1:3101
+    }
+
+    # Everything else → Next.js. Next's own next.config.ts rewrites act
+    # as defense-in-depth: any /api/* path not explicitly routed above
+    # still reaches nabu-api via the Next rewrite layer.
+    handle {
+        reverse_proxy 127.0.0.1:3001
+    }
+
+    log {
+        output file /var/log/caddy/nabu.log
+        format json
+    }
+}

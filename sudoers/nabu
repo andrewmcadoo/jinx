@@ -1,0 +1,8 @@
+# Per-project NOPASSWD restart entries for the nabu deploy script.
+# Install: sudo install -m 0440 -o root -g root nabu /etc/sudoers.d/nabu
+# (validate with `sudo visudo -cf /etc/sudoers.d/nabu` before installing).
+#
+# scripts/deploy/deploy-jinx.sh in the nabu repo runs
+# `sudo -n systemctl restart nabu-web nabu-api` after the atomic symlink
+# flip — no human interaction, no password prompt.
+andrew ALL=(root) NOPASSWD: /bin/systemctl restart nabu-web, /bin/systemctl restart nabu-api

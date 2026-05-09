@@ -1,0 +1,44 @@
+# nabu-api — FastAPI/uvicorn backend for nabu (scratch tier).
+# Install: sudo install -m 0644 -o root -g root nabu-api.service /etc/systemd/system/
+#          sudo systemctl daemon-reload
+# DO NOT enable until /srv/nabu/current exists (see JINX.md "Don't").
+
+[Unit]
+Description=nabu-api (FastAPI/uvicorn backend)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=andrew
+Group=andrew
+# Monorepo: api lives under apps/api. uvicorn binds explicitly via CLI
+# args (it does not honor PORT/HOSTNAME env vars by default).
+WorkingDirectory=/srv/nabu/current/apps/api
+EnvironmentFile=/srv/nabu/shared/.env.production
+ExecStart=/home/andrew/.local/bin/uv run uvicorn app.main:app --host 127.0.0.1 --port 3101
+Restart=on-failure
+RestartSec=2s
+
+# Hardening — mirrors systemd/_example.service.
+# ReadWritePaths includes the agent-tracing snapshot dir which the chat
+# handler writes to (NABU_SNAPSHOT_DIR=/srv/nabu/shared/agent-tracing
+# per nabu-chl7 step 5).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/nabu/shared
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+# Intentionally NOT set:
+#   MemoryDenyWriteExecute=true       — some Python deps mmap+exec at import
+#   SystemCallFilter=...              — too tight for diverse Python deps
+
+[Install]
+WantedBy=multi-user.target
