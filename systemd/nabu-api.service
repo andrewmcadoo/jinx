@@ -16,6 +16,12 @@ Group=andrew
 # args (it does not honor PORT/HOSTNAME env vars by default).
 WorkingDirectory=/srv/nabu/current/apps/api
 EnvironmentFile=/srv/nabu/shared/.env.production
+# uv at runtime tries to acquire a lock under $UV_CACHE_DIR (default
+# ~/.cache/uv). With ProtectHome=read-only below, that path is read-only
+# and `uv run` exits with "Could not acquire lock: Read-only file
+# system". Redirect uv's cache to /srv/nabu/shared (already in
+# ReadWritePaths). Mkdir is handled by deploy-jinx.sh.
+Environment=UV_CACHE_DIR=/srv/nabu/shared/uv-cache
 ExecStart=/home/andrew/.local/bin/uv run uvicorn app.main:app --host 127.0.0.1 --port 3101
 Restart=on-failure
 RestartSec=2s
