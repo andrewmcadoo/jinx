@@ -22,7 +22,13 @@ EnvironmentFile=/srv/nabu/shared/.env.production
 # system". Redirect uv's cache to /srv/nabu/shared (already in
 # ReadWritePaths). Mkdir is handled by deploy-jinx.sh.
 Environment=UV_CACHE_DIR=/srv/nabu/shared/uv-cache
-ExecStart=/home/andrew/.local/bin/uv run uvicorn app.main:app --host 127.0.0.1 --port 3101
+# `uv run` does an implicit sync that regenerates entry-point shims under
+# /srv/nabu/releases/<ts>/.venv/bin/. That path is outside ReadWritePaths,
+# so the write hits EROFS and the unit crashloops (nabu-fltc). The deploy
+# script pre-syncs the venv (deploy-jinx.sh: `uv sync --frozen ...`), so
+# --no-sync is safe; --frozen is defense-in-depth against accidental
+# network resolution if --no-sync is ever removed.
+ExecStart=/home/andrew/.local/bin/uv run --frozen --no-sync uvicorn app.main:app --host 127.0.0.1 --port 3101
 Restart=on-failure
 RestartSec=2s
 
