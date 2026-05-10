@@ -82,9 +82,17 @@ inbound, default allow outbound.
 | ----------------------------------- | ----- | --------------------------- | ------ |
 | `jinx.generalproducts.io`           | A     | `<jinx-static-ip>`          | ON     |
 | `*.jinx.generalproducts.io`         | CNAME | `jinx.generalproducts.io`   | ON     |
+| `ssh.jinx.generalproducts.io`       | A     | `<jinx-static-ip>`          | **OFF** (DNS-only) |
 
 Per-project subdomains do **not** need their own DNS records — the wildcard
 covers them. They only need a Caddy site block (§3.5).
+
+The explicit `ssh.jinx.generalproducts.io` record exists because Cloudflare's
+proxy only forwards a fixed set of TCP ports (80/443/etc.) — port 22 is not
+one of them. An `ssh` to any Proxied name times out. The explicit DNS-only
+record overrides the proxied wildcard for this single label so `ssh jinx`
+(via the `~/.ssh/config` block in §4.4) reaches the origin's port 22 directly.
+Do **not** turn the proxy ON for this record.
 
 Cloudflare SSL/TLS mode: **Full (strict)**. Browser ↔ Cloudflare uses
 Cloudflare's edge cert; Cloudflare ↔ Jinx uses the Origin Certificate (§3.4).
@@ -308,7 +316,7 @@ before write.
 
 ```
 Host jinx
-    Hostname jinx.generalproducts.io
+    Hostname ssh.jinx.generalproducts.io
     User andrew
     IdentityFile ~/.ssh/jinx_ed25519
     IdentitiesOnly yes

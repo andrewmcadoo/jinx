@@ -1522,7 +1522,7 @@ Append to `~/.ssh/config`:
 
 ```
 Host jinx
-    Hostname jinx.generalproducts.io
+    Hostname ssh.jinx.generalproducts.io
     User andrew
     ServerAliveInterval 60
 ```

@@ -6,10 +6,14 @@ Spec: `docs/superpowers/specs/2026-05-03-jinx-scratch-box-design.md`.
 ## SSH
 
 ```
-ssh andrew@jinx.generalproducts.io
+ssh andrew@ssh.jinx.generalproducts.io
 # or, if ~/.ssh/config has Host jinx:
 ssh jinx
 ```
+
+> The hostname is `ssh.jinx.generalproducts.io` (DNS-only), **not**
+> `jinx.generalproducts.io` (Proxied). Cloudflare doesn't forward port 22, so
+> `ssh ...@jinx.generalproducts.io` times out by design. See spec §3.3.
 
 ## Adding a project
 
