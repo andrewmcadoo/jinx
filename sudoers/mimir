@@ -1,0 +1,27 @@
+# Per-project NOPASSWD entries for the mimir deploy pipeline.
+# Install: sudo install -m 0440 -o root -g root mimir /etc/sudoers.d/mimir
+# (validate with `sudo visudo -cf /etc/sudoers.d/mimir` before installing).
+#
+# Two callers exercise the entries below:
+#
+#   1. mimir's scripts/deploy/deploy.sh runs
+#      `sudo -n systemctl restart mimir-api mimir-web` after the atomic
+#      symlink flip — covered by the two restart entries.
+#
+#   2. The GH Actions workflow at mimir/.github/workflows/deploy.yml
+#      stages updated unit files at /tmp/mimir-{api,web}.service.new
+#      and atomically swaps them in place when systemd unit content
+#      changes. The install + daemon-reload entries cover that path so
+#      the workflow can run unattended. (Pattern adapted from the
+#      removed sudoers/nabu — see git 820ac9f for the original.)
+#      Source paths are fixed to /tmp; dest paths, mode, and owner are
+#      exact-matched so the entries can't be used to overwrite arbitrary
+#      files.
+
+Cmnd_Alias MIMIR_DEPLOY = /bin/systemctl restart mimir-api, \
+                          /bin/systemctl restart mimir-web, \
+                          /bin/systemctl daemon-reload, \
+                          /usr/bin/install -m 0644 -o root -g root /tmp/mimir-api.service.new /etc/systemd/system/mimir-api.service, \
+                          /usr/bin/install -m 0644 -o root -g root /tmp/mimir-web.service.new /etc/systemd/system/mimir-web.service
+
+andrew ALL=(root) NOPASSWD: MIMIR_DEPLOY
