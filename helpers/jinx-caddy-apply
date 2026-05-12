@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# jinx-caddy-apply — `caddy validate` then `systemctl restart caddy`.
+# Encodes the "restart, not reload" rule (RUNBOOK).
+set -euo pipefail
+
+if ! caddy validate --config /etc/caddy/Caddyfile; then
+    echo "caddy validate FAILED — refusing to restart" >&2
+    exit 1
+fi
+systemctl restart caddy
+echo "caddy restarted at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
