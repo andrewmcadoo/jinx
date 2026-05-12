@@ -89,20 +89,17 @@ jobs:
         # See sudoers/01-andrew-nopasswd header + RUNBOOK § "Developer
         # convenience: blanket NOPASSWD" for the security trade-off.
         run: sudo visudo -cf sudoers/01-andrew-nopasswd
-      - name: Verify bootstrap.sh inline copy matches the repo file
-        # Defends against drift between the two copies. Extracts the heredoc
-        # body bootstrap.sh writes to /etc/sudoers.d/00-andrew and diffs it
-        # against the canonical file (ignoring comment-only lines so the
-        # repo file can carry its header).
+
+  userdata-drift:
+    name: userdata.sh matches bootstrap.sh
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Regenerate userdata.sh into a temp dir
         run: |
-          tmp=$(mktemp)
-          # Pull the line bootstrap.sh writes via printf: it's the only
-          # `printf '%s ALL=(ALL) ALL\n'` in the file.
-          grep -E "^[[:space:]]*printf '%s ALL=" bootstrap.sh \
-            | sed -E "s/^[[:space:]]*printf '%s ALL=\(ALL\) ALL.*$/\${LINUX_USER} ALL=(ALL) ALL/" \
-            | sed -E 's/\$\{LINUX_USER\}/andrew/' \
-            > "$tmp"
-          # Strip comments + blank lines from the canonical file for the diff.
-          grep -vE '^[[:space:]]*(#|$)' sudoers/00-andrew > "${tmp}.canonical"
-          diff -u "${tmp}.canonical" "$tmp"
-          rm -f "$tmp" "${tmp}.canonical"
+          tmp="$(mktemp -d)"
+          cp bootstrap.sh "$tmp/bootstrap.sh"
+          mkdir -p "$tmp/scripts"
+          cp scripts/make-userdata.sh "$tmp/scripts/"
+          (cd "$tmp" && bash scripts/make-userdata.sh)
+          diff -u userdata.sh "$tmp/userdata.sh"
