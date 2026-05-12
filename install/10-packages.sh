@@ -13,7 +13,7 @@ retry apt-get update -qq
 log "Installing baseline + operator tools"
 apt-get install -y --no-install-recommends \
     ca-certificates curl gnupg ufw unattended-upgrades git \
-    tmux htop jq rsync vim-tiny ncdu less openssl
+    tmux htop jq rsync vim-tiny ncdu less openssl openssh-server
 
 if ! command -v caddy >/dev/null; then
     log "Adding Caddy apt repo"
