@@ -20,5 +20,5 @@ ports across projects — even if a project is paused, leave its row.
 | Project   | Role   | Port | Status   | Notes                  |
 | --------- | ------ | ---- | -------- | ---------------------- |
 | _example_ | _web_  | 3099 | reserved | Template; never bound. Sentinel out of normal allocation flow — avoids collision with the Next.js dev-server default of `:3000`. |
-| mimir     | web    | 3001 | reserved | Next.js 16 SSR frontend. Caddy default `handle` → this port. Promote to `active` after first deploy. |
-| mimir     | api    | 3199 | reserved | FastAPI/uvicorn backend. Caddy `handle_path /api/*` strips `/api` and forwards here (api mounts routers at root — `apps/api/src/app/main.py:38-40`). Top-of-31xx by deliberate choice — leaves 3101-3198 open for future projects. Promote to `active` after first deploy. |
+| mimir     | web    | 3001 | active   | Next.js 16 SSR frontend. Caddy default `handle` → this port. First deploy 2026-05-12. |
+| mimir     | api    | 3199 | active   | FastAPI/uvicorn backend. Caddy `handle_path /api/*` strips `/api` and forwards here (api mounts routers at root — `apps/api/src/app/main.py:38-40`). Top-of-31xx by deliberate choice — leaves 3101-3198 open for future projects. First deploy 2026-05-12. |
