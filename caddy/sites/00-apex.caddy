@@ -4,8 +4,5 @@ jinx.generalproducts.io {
     root * /srv/_apex
     file_server
 
-    log {
-        output file /var/log/caddy/apex.log
-        format json
-    }
+    import common_log apex
 }

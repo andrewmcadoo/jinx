@@ -15,8 +15,5 @@ langfuse.nabu.jinx.generalproducts.io {
     # LANGFUSE_HOST.
     reverse_proxy 127.0.0.1:3030
 
-    log {
-        output file /var/log/caddy/langfuse-nabu.log
-        format json
-    }
+    import common_log langfuse-nabu
 }

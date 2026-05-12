@@ -23,8 +23,5 @@ example.jinx.generalproducts.io {
         reverse_proxy 127.0.0.1:3099
     }
 
-    log {
-        output file /var/log/caddy/example.log
-        format json
-    }
+    import common_log example
 }
