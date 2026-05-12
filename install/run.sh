@@ -12,7 +12,7 @@ require_root
 
 trap 'log "ERROR: step ${JINX_STEP:-?} failed at line ${LINENO}: ${BASH_COMMAND}"' ERR
 
-JINX_STEP=run log "Starting install at $(date -u --iso-8601=seconds)"
+JINX_STEP=run log "Starting install at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 
 shopt -s nullglob
 steps=("${SCRIPT_DIR}"/[0-9][0-9]-*.sh)

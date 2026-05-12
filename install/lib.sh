@@ -13,7 +13,7 @@ log() {
 
 require_root() {
     if [[ $EUID -ne 0 ]]; then
-        log "ERROR: must run as root (currently $EUID)"
+        printf '[bootstrap] ERROR: must run as root (currently %s)\n' "$EUID" >&2
         exit 1
     fi
 }
