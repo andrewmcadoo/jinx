@@ -41,6 +41,28 @@ ssh jinx 'echo "https://hc-ping.com/<uuid>" | sudo tee /etc/jinx/healthchecks-ur
 
 The 15-minute cron entry (`/etc/cron.d/jinx-healthchecks`, installed by `install/80-monitoring.sh`) will begin posting disk/load/failed-units data immediately. Healthchecks.io alerts on missed heartbeats.
 
+### 3. Enable the AutoSnapshot addon
+
+Lightsail's AutoSnapshot addon is account-level config and is **not** carried over when an instance is re-created from a snapshot or launched fresh — even if the source instance had it enabled. Run once after each new instance creation (locally, AWS CLI authenticated for the account owning `jinx`):
+
+```
+aws lightsail enable-add-on \
+  --resource-name jinx \
+  --add-on-request "addOnType=AutoSnapshot,autoSnapshotAddOnRequest={snapshotTimeOfDay=03:00}" \
+  --region us-east-1
+```
+
+Verify:
+
+```
+aws lightsail get-instance --instance-name jinx --region us-east-1 \
+  --query 'instance.addOns'
+```
+
+Expected: one entry with `name: "AutoSnapshot"`, `status: "Enabled"`, `snapshotTimeOfDay: "03:00"`. `Enabling` is a brief transitional state right after the API call — re-query after ~60s. Daily snapshot, 7-day retention (addon default), matches spec §3.1.
+
+> **Deletion gotcha:** once the addon is enabled, `aws lightsail delete-instance` will refuse to delete `jinx` unless you pass `--force-delete-add-ons`. Required when tearing down to re-launch from scratch (the situation that caused this section to exist).
+
 ## Adding a project
 
 1. **Allocate a port.** Edit `PORTS.md`, append a row, commit.
@@ -212,7 +234,12 @@ ssh jinx 'sudo /usr/local/bin/refresh-ssh-keys'
    the static IP is briefly unattached, so CF can't reach origin.
    Tolerable for a scratch box; mention in any user-visible status post.
 4. Cloudflare DNS auto-resolves on next TTL (no change needed if static IP is reused).
-5. SSH to verify, then delete the old instance.
+5. Re-enable AutoSnapshot on `jinx-restored` (see [Post-bootstrap setup §3](#3-enable-the-autosnapshot-addon)) — the addon does **not** carry over from the source instance. Use `--resource-name jinx-restored`.
+6. SSH to verify, then delete the old instance. Since the old `jinx` has AutoSnapshot enabled, append `--force-delete-add-ons`:
+   ```
+   aws lightsail delete-instance --instance-name jinx \
+     --force-delete-add-ons --region us-east-1
+   ```
 
 ## Emergency: locked out of SSH
 
