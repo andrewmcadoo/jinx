@@ -1,298 +1,52 @@
 #!/usr/bin/env bash
-# bootstrap.sh — first-boot configuration for Jinx (jinx.generalproducts.io).
+# bootstrap.sh — first-boot configuration for Jinx.
 #
-# Run once as the Lightsail launch script (cloud-init user-data). Idempotent:
-# safe to re-run (e.g. after a snapshot restore) — every section guards against
-# repeated work.
+# Runs as Lightsail cloud-init user-data. Installs git, clones this repo
+# to /opt/jinx, then execs install/run.sh. Idempotent: safe to re-run
+# (e.g. after snapshot restore) — re-running re-pulls the repo and
+# re-runs every install step.
 #
-# Spec: docs/superpowers/specs/2026-05-03-jinx-scratch-box-design.md
+# Spec: docs/superpowers/specs/2026-05-11-bootstrap-rework-design.md
 
 set -euo pipefail
-# Default file mode 0644, default dir mode 0755. Cloud-init sometimes runs
-# us with umask 0077, which would create the bootstrap log world-unreadable
-# and break later commands that pipe through `tee -a`. Force a sane default.
 umask 022
 
-# --- Configuration ---
-GITHUB_HANDLE="andrewmcadoo"
-LINUX_USER="andrew"
-SRV_ROOT="/srv"
-LOG_FILE="/var/log/jinx-bootstrap.log"
+JINX_REPO="${JINX_REPO:-https://github.com/andrewmcadoo/jinx.git}"
+JINX_REF="${JINX_REF:-main}"
+JINX_DIR="${JINX_DIR:-/opt/jinx}"
+LOG_FILE=/var/log/jinx-bootstrap.log
 
-# --- Helpers ---
-log() {
-    printf '[bootstrap] %s\n' "$*" | tee -a "$LOG_FILE"
-}
+log() { printf '[bootstrap] %s\n' "$*" | tee -a "$LOG_FILE"; }
 
-require_root() {
-    if [[ $EUID -ne 0 ]]; then
-        log "ERROR: must run as root (currently $EUID)"
-        exit 1
-    fi
-}
+if [[ $EUID -ne 0 ]]; then
+    printf '[bootstrap] ERROR: must run as root (currently %s)\n' "$EUID" >&2
+    exit 1
+fi
 
-# Retry a command up to 3 times with 5s sleep between attempts.
-# Used to wrap network-dependent calls (apt-get update, curl) so transient
-# failures during cloud-init don't brick the bootstrap.
-retry() {
-    local attempt
-    for attempt in 1 2 3; do
-        if "$@"; then
-            return 0
-        fi
-        log "Command failed (attempt $attempt/3): $*"
-        sleep 5
-    done
-    log "ERROR: command failed after 3 attempts: $*"
-    return 1
-}
+log "Bootstrap start $(date -u '+%Y-%m-%dT%H:%M:%SZ'), repo=$JINX_REPO ref=$JINX_REF"
 
-# Validate that a file looks like a GitHub-served authorized_keys list:
-# every non-blank line begins with a known SSH public-key algorithm. A
-# defensive check against GitHub serving an HTML error page (CDN incidents,
-# rate-limit pages) instead of the keys file.
-validate_ssh_keys_file() {
-    local file="$1"
-    [[ -s "$file" ]] || return 1
-    # `grep -qvE pattern` exits 0 if any line FAILS to match (i.e. is bad);
-    # invert that with !.
-    if grep -vE '^(ssh-rsa|ssh-ed25519|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com)( |$)' "$file" \
-         | grep -qE '\S'; then
-        return 1
-    fi
-    return 0
-}
+# Minimal apt prereqs needed just to clone the repo. install/10-packages.sh
+# handles the full package set afterward.
+export DEBIAN_FRONTEND=noninteractive
+for attempt in 1 2 3; do
+    if apt-get update -qq; then break; fi
+    log "apt-get update failed (attempt $attempt/3); sleeping 5s"
+    sleep 5
+done
+apt-get install -y --no-install-recommends ca-certificates curl git
 
-# Install OS packages and Caddy from the official Cloudsmith apt repo.
-# Idempotent: apt-get install --no-upgrade is a no-op if already installed.
-install_packages() {
-    log "Updating apt cache"
-    retry env DEBIAN_FRONTEND=noninteractive apt-get update -qq
+# Clone or pull-update the repo. Re-runs re-converge on $JINX_REF.
+if [[ -d "${JINX_DIR}/.git" ]]; then
+    log "Updating existing repo at ${JINX_DIR}"
+    git -C "$JINX_DIR" fetch --quiet origin
+    git -C "$JINX_DIR" checkout --quiet "$JINX_REF"
+    git -C "$JINX_DIR" pull --quiet --ff-only || log "pull --ff-only failed; staying at current ref"
+else
+    log "Cloning ${JINX_REPO} → ${JINX_DIR} at ref ${JINX_REF}"
+    git clone --quiet --branch "$JINX_REF" "$JINX_REPO" "$JINX_DIR"
+fi
 
-    # gnupg is required for `gpg --dearmor` below when adding the Caddy
-    # apt repo; install it here as part of the baseline so the Caddy block
-    # doesn't have to think about ordering.
-    log "Installing baseline packages"
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        ca-certificates curl gnupg ufw unattended-upgrades
+current_ref=$(git -C "$JINX_DIR" rev-parse --short HEAD)
+log "Handing off to install/run.sh at ${current_ref}"
 
-    if ! command -v caddy >/dev/null; then
-        log "Adding Caddy apt repo"
-        curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
-            | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-        curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
-            | tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
-        # Second `apt-get update` is required: the call above only refreshed
-        # cache for repos known at that time; Caddy's repo was added after.
-        retry env DEBIAN_FRONTEND=noninteractive apt-get update -qq
-        DEBIAN_FRONTEND=noninteractive apt-get install -y caddy
-    else
-        # `caddy version` writes to a pipe; `head -1` closes early and the
-        # process can fail with SIGPIPE under `set -o pipefail`. Capture
-        # stderr -> /dev/null and read the first line via parameter
-        # expansion to keep the failure mode contained.
-        local caddy_v
-        caddy_v=$(caddy version 2>/dev/null) || caddy_v="(unknown)"
-        log "Caddy already installed: ${caddy_v%%$'\n'*}"
-    fi
-}
-
-# Configure UFW: deny inbound by default, allow SSH (22) and HTTPS (443).
-# Port 80 is intentionally NOT opened — see spec §3.2.
-configure_ufw() {
-    log "Configuring UFW"
-    ufw --force reset >/dev/null
-    ufw default deny incoming
-    ufw default allow outgoing
-    ufw allow 22/tcp comment 'SSH'
-    ufw allow 443/tcp comment 'HTTPS via Caddy'
-    ufw --force enable
-    ufw status verbose | tee -a "$LOG_FILE"
-}
-
-# Enable unattended security upgrades. Reboot at 04:00 UTC if a kernel
-# update requires it.
-configure_unattended_upgrades() {
-    log "Configuring unattended-upgrades"
-    cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
-APT::Periodic::Update-Package-Lists "1";
-APT::Periodic::Unattended-Upgrade "1";
-APT::Periodic::AutocleanInterval "7";
-EOF
-    cat > /etc/apt/apt.conf.d/52unattended-upgrades-jinx <<'EOF'
-Unattended-Upgrade::Automatic-Reboot "true";
-Unattended-Upgrade::Automatic-Reboot-Time "04:00";
-EOF
-    systemctl enable --now unattended-upgrades
-}
-
-# Create the single Linux user, populate authorized_keys from GitHub.
-# Idempotent: useradd is no-op if user exists; key file is overwritten.
-configure_user() {
-    log "Configuring user $LINUX_USER"
-    if ! id "$LINUX_USER" >/dev/null 2>&1; then
-        useradd --create-home --shell /bin/bash --groups sudo "$LINUX_USER"
-    fi
-    # Re-assert sudo group membership on every run — the if-block above only
-    # fires on first creation.
-    usermod -aG sudo "$LINUX_USER"
-
-    local ssh_dir="/home/${LINUX_USER}/.ssh"
-    install -d -m 0700 -o "$LINUX_USER" -g "$LINUX_USER" "$ssh_dir"
-
-    log "Pulling SSH keys for $GITHUB_HANDLE from GitHub"
-    local keys_url="https://github.com/${GITHUB_HANDLE}.keys"
-    local tmp_keys
-    tmp_keys=$(mktemp)
-    local attempt
-    for attempt in 1 2 3; do
-        if curl -fsSL --max-time 15 "$keys_url" -o "$tmp_keys" \
-            && validate_ssh_keys_file "$tmp_keys"; then
-            break
-        fi
-        log "GitHub key fetch attempt $attempt failed; sleeping 5s"
-        sleep 5
-    done
-    if ! validate_ssh_keys_file "$tmp_keys"; then
-        log "ERROR: $keys_url returned no valid keys after 3 attempts"
-        rm -f "$tmp_keys"
-        exit 1
-    fi
-    install -m 0600 -o "$LINUX_USER" -g "$LINUX_USER" "$tmp_keys" "${ssh_dir}/authorized_keys"
-    rm -f "$tmp_keys"
-    log "Installed $(wc -l < "${ssh_dir}/authorized_keys") SSH key(s)"
-}
-
-# Drop in sshd hardening config + base sudoers entry. Both validated before
-# install (sshd -t / visudo -cf) so we never lock ourselves out.
-configure_sshd_and_sudo() {
-    log "Configuring sshd hardening"
-    # Mirror of sshd/90-jinx.conf in the repo. Keep both in sync — bootstrap
-    # runs from cloud-init user-data and can't read the repo, so duplication
-    # is by design. AllowUsers encodes the single-user invariant (spec §4).
-    cat > /etc/ssh/sshd_config.d/90-jinx.conf <<'EOF'
-# Jinx hardening — see spec §4.2.
-PasswordAuthentication no
-PermitRootLogin no
-AuthenticationMethods publickey
-ChallengeResponseAuthentication no
-KbdInteractiveAuthentication no
-AllowUsers andrew
-EOF
-
-    # Validate before reload — sshd refuses to start with a bad config.
-    sshd -t
-    systemctl reload ssh
-
-    log "Configuring sudoers for $LINUX_USER"
-    # Mirror of sudoers/00-andrew in the repo (single source of truth). The
-    # CI visudo-check job diffs this heredoc against that file to catch drift.
-    # Bootstrap runs from cloud-init user-data and can't read the repo, so
-    # the duplication is by design — keep the body identical.
-    local sudoers_tmp
-    sudoers_tmp=$(mktemp)
-    printf '%s ALL=(ALL) ALL\n' "$LINUX_USER" > "$sudoers_tmp"
-    visudo -cf "$sudoers_tmp"  # exits non-zero on syntax error
-    install -m 0440 -o root -g root "$sudoers_tmp" "/etc/sudoers.d/00-${LINUX_USER}"
-    rm -f "$sudoers_tmp"
-}
-
-# Create the /srv tree, Caddy config dirs, log dir, and TLS material dir.
-# Apex landing page gets a placeholder until the real index.html is deployed.
-configure_filesystem() {
-    log "Creating /srv and Caddy directories"
-    install -d -m 0755 -o "$LINUX_USER" -g "$LINUX_USER" "$SRV_ROOT"
-    install -d -m 0755 -o "$LINUX_USER" -g "$LINUX_USER" "${SRV_ROOT}/_apex"
-
-    install -d -m 0755 -o root -g root /etc/caddy/sites
-    install -d -m 0750 -o root -g caddy /etc/ssl/jinx
-    install -d -m 0755 -o caddy -g caddy /var/log/caddy
-
-    # Pre-create per-site Caddy log files with caddy ownership (mim-lp4).
-    # If we don't, the apt postinst race creates them root:root mode 0600
-    # the first time Caddy starts, and subsequent reloads as the caddy
-    # user fail with `open …: permission denied`. Guarded with `! -f` so
-    # snapshot-restore re-runs do not truncate accumulated logs.
-    #
-    # First-boot path: only caddy.log + apex.log are pre-created here
-    # (00-apex.caddy lands in the post-bootstrap manual steps). Each
-    # additional project pre-creates its own per-site log via RUNBOOK
-    # "Adding a project" step 6 (nabu-jaau).
-    #
-    # Snapshot-restore re-run path: /etc/caddy/sites/*.caddy already
-    # exist from the prior boot, so we auto-discover them by parsing
-    # `output file /var/log/caddy/<name>.log` directives — covers the
-    # case where logs were nuked (e.g. /var/log on a separate volume
-    # that was rebuilt) without requiring this list to be edited
-    # whenever a new project is added.
-    declare -a log_files=("caddy.log" "apex.log")
-    if compgen -G "/etc/caddy/sites/*.caddy" >/dev/null; then
-        while IFS= read -r path; do
-            log_files+=("$(basename "$path")")
-        done < <(grep -hE '^[[:space:]]*output file /var/log/caddy/[^[:space:]]+\.log' \
-                 /etc/caddy/sites/*.caddy 2>/dev/null | awk '{print $3}')
-    fi
-    for f in "${log_files[@]}"; do
-        if [[ ! -f "/var/log/caddy/${f}" ]]; then
-            install -m 0644 -o caddy -g caddy /dev/null "/var/log/caddy/${f}"
-        fi
-    done
-
-    if [[ ! -f "${SRV_ROOT}/_apex/index.html" ]]; then
-        log "Installing placeholder apex index.html"
-        local apex_tmp
-        apex_tmp=$(mktemp)
-        cat > "$apex_tmp" <<'EOF'
-<!doctype html>
-<title>Jinx</title>
-<h1>Jinx is up.</h1>
-<p>Projects will appear here.</p>
-EOF
-        # install(1) sets owner, group and mode atomically; preferable to
-        # cat > … followed by chown/chmod.
-        install -m 0644 -o "$LINUX_USER" -g "$LINUX_USER" \
-            "$apex_tmp" "${SRV_ROOT}/_apex/index.html"
-        rm -f "$apex_tmp"
-    fi
-}
-
-# Print the post-bootstrap manual checklist. Bootstrap intentionally does NOT
-# install the Caddy config or the Origin Cert — those land via scp from the
-# operator's laptop after first SSH (see spec §6.2 launch procedure).
-print_manual_steps() {
-    cat <<EOF | tee -a "$LOG_FILE"
-
-==============================================================
-Bootstrap finished. Remaining manual steps (from your laptop):
-
-  1. scp caddy/Caddyfile andrew@<jinx-ip>:/tmp/
-     scp caddy/sites/00-apex.caddy andrew@<jinx-ip>:/tmp/
-     ssh jinx 'sudo install -m 0644 -o root -g root /tmp/Caddyfile /etc/caddy/Caddyfile
-               sudo install -m 0644 -o root -g root /tmp/00-apex.caddy /etc/caddy/sites/00-apex.caddy
-               rm /tmp/Caddyfile /tmp/00-apex.caddy'
-  2. scp apex/index.html andrew@<jinx-ip>:/tmp/
-     ssh jinx 'sudo install -m 0644 -o andrew -g andrew /tmp/index.html /srv/_apex/index.html'
-  3. Generate Cloudflare Origin Cert; scp cert.pem + key.pem; install at
-     /etc/ssl/jinx/ with cert 0644 root:caddy, key 0640 root:caddy.
-  4. ssh jinx 'sudo systemctl enable --now caddy && sudo systemctl reload caddy'
-  5. curl -I https://jinx.generalproducts.io   # expect 200
-==============================================================
-EOF
-}
-
-# --- Main ---
-main() {
-    require_root
-    log "Starting Jinx bootstrap at $(date -u --iso-8601=seconds)"
-    log "Config: user=$LINUX_USER handle=$GITHUB_HANDLE srv=$SRV_ROOT"
-    install_packages
-    configure_ufw
-    configure_unattended_upgrades
-    configure_user
-    configure_sshd_and_sudo
-    configure_filesystem
-    print_manual_steps
-    log "Bootstrap complete"
-}
-
-main "$@"
+exec bash "${JINX_DIR}/install/run.sh"
