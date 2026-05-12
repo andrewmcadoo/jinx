@@ -1,0 +1,58 @@
+# mimir-api — FastAPI/uvicorn backend for mimir (scratch tier).
+# Install: sudo install -m 0644 -o root -g root mimir-api.service /etc/systemd/system/
+#          sudo systemctl daemon-reload
+# DO NOT enable until /srv/mimir/current exists (see JINX.md "Don't").
+
+[Unit]
+Description=mimir-api (FastAPI/uvicorn backend)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=andrew
+Group=andrew
+# Monorepo: api lives under apps/api. uvicorn binds explicitly via CLI
+# args (it does not honor PORT/HOSTNAME env vars by default). --app-dir
+# src is required because the package lives at apps/api/src/app/ — see
+# apps/api/pyproject.toml `packages = ["src/app"]`.
+WorkingDirectory=/srv/mimir/current/apps/api
+EnvironmentFile=/srv/mimir/shared/.env.production
+# uv at runtime tries to acquire a lock under $UV_CACHE_DIR (default
+# ~/.cache/uv). With ProtectHome=read-only below, that path is read-only
+# and `uv run` exits with "Could not acquire lock: Read-only file
+# system". Redirect uv's cache into /srv/mimir/shared (already in
+# ReadWritePaths). Mkdir is handled by scripts/deploy/deploy.sh.
+Environment=UV_CACHE_DIR=/srv/mimir/shared/uv-cache
+# `uv run` does an implicit sync that regenerates entry-point shims under
+# /srv/mimir/releases/<ts>/.venv/bin/. That path is outside ReadWritePaths,
+# so the write hits EROFS and the unit crashloops. The deploy script
+# pre-syncs the venv (`uv sync --frozen --no-dev`), so --no-sync is safe;
+# --frozen is defense-in-depth against accidental network resolution if
+# --no-sync is ever removed. (Rationale: nabu-fltc.)
+ExecStart=/home/andrew/.local/bin/uv run --frozen --no-sync uvicorn app.main:app --app-dir src --host 127.0.0.1 --port 3199
+Restart=on-failure
+RestartSec=2s
+
+# Hardening — mirrors systemd/_example.service and nabu-api.service.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/mimir/shared
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+# AF_NETLINK kept symmetric with mimir-web.service. Python+asyncio doesn't
+# fail today, but uvloop/anyio paths can call into getifaddrs() transitively,
+# and divergence between the two units is a footgun. (Rationale: nabu-ckv4.)
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+# Intentionally NOT set:
+#   MemoryDenyWriteExecute=true       — some Python deps mmap+exec at import
+#   SystemCallFilter=...              — too tight for diverse Python deps
+
+[Install]
+WantedBy=multi-user.target

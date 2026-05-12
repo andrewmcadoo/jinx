@@ -1,0 +1,55 @@
+# mimir-web — Next.js 16 frontend for mimir (scratch tier).
+# Install: sudo install -m 0644 -o root -g root mimir-web.service /etc/systemd/system/
+#          sudo systemctl daemon-reload
+# DO NOT enable until /srv/mimir/current exists (see JINX.md "Don't").
+#
+# Path A (on-box build): scripts/deploy/deploy.sh runs `bun run build`
+# inside the release dir, leaving a populated .next/. The unit then runs
+# `bun run start` (= next start) which reads .next/. If `next build` ever
+# OOMs on the 2 GiB Lightsail box (nabu hit load-avg 38 → SIGKILL — see
+# nabu-bb3q), switch to Path B: GH Actions builds the Next standalone
+# bundle and ships it to /srv/mimir/current-web; this unit's ExecStart
+# becomes `bun apps/web/server.js`.
+
+[Unit]
+Description=mimir-web (Next.js 16 frontend)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=andrew
+Group=andrew
+WorkingDirectory=/srv/mimir/current/apps/web
+EnvironmentFile=/srv/mimir/shared/.env.production
+Environment=NODE_ENV=production
+Environment=PORT=3001
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/home/andrew/.bun/bin/bun run start
+Restart=on-failure
+RestartSec=2s
+
+# Hardening — mirrors systemd/_example.service and nabu-web.service.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/mimir/shared
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+# AF_NETLINK is required by getifaddrs() — Next.js / Bun call it during
+# startup to enumerate network interfaces. Without it, bun terminates
+# with `Unhandled Rejection: getifaddrs returned EAFNOSUPPORT (97)` and
+# the service stops listening on PORT — the public URL then 502s.
+# (Rationale: nabu-ckv4.)
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+# Intentionally NOT set:
+#   MemoryDenyWriteExecute=true       — breaks the V8 JIT used by Next/Bun
+#   SystemCallFilter=...              — too tight for Node/Bun deps
+
+[Install]
+WantedBy=multi-user.target

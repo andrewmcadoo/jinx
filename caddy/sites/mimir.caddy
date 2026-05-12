@@ -1,0 +1,29 @@
+mimir.jinx.generalproducts.io {
+    tls /etc/ssl/jinx/cert.pem /etc/ssl/jinx/key.pem
+
+    # Strip any client-supplied X-Forwarded-For BEFORE reverse_proxy.
+    # Caddy's reverse_proxy *appends* the immediate-peer IP to whatever
+    # XFF the client sent (it does NOT replace), so without this directive
+    # a forged "X-Forwarded-For: 1.2.3.4" would arrive at mimir-api as
+    # "1.2.3.4, <real>". The api doesn't read XFF today, but stripping
+    # here keeps the door closed for the day it does (per-IP rate limits,
+    # audit logging, etc.). See nabu.caddy:4-16 for the prior-art incident.
+    request_header -X-Forwarded-For
+
+    # Path routing. The api mounts every router at root (no prefix= on
+    # include_router — apps/api/src/app/main.py:38-40), so handle_path
+    # strips /api before forwarding. Public /api/health → api receives
+    # /health and responds from apps/api/src/app/routes/health.py:11.
+    handle_path /api/* {
+        reverse_proxy 127.0.0.1:3199
+    }
+
+    # Everything else → Next.js. Phase 1 has no static-only assets to
+    # short-circuit; if that changes, add a `handle` block above this one
+    # for the asset prefix (e.g. /_next/static/*).
+    handle {
+        reverse_proxy 127.0.0.1:3001
+    }
+
+    import common_log mimir
+}
