@@ -59,13 +59,20 @@ disk=$(df --output=pcent / | tail -1 | tr -dc '0-9')
 pass "disk at ${disk}%"
 
 # 9. No failed units (skip if systemd is not PID 1).
-if systemctl is-system-running >/dev/null 2>&1; then
-    failed_count=$(systemctl --failed --no-legend | wc -l)
-    [[ "$failed_count" -eq 0 ]] || fail "${failed_count} failed unit(s): $(systemctl --failed --no-legend)"
-    pass "no failed units"
-else
-    log "warn: systemd not available (acceptable in container without systemd PID 1)"
-fi
+# `systemctl is-system-running` exits non-zero in `starting`/`degraded`/etc.,
+# so gate on the state *name* (stdout), not the exit code, otherwise check 9
+# is skipped on first boot while systemd is still settling.
+state=$(systemctl is-system-running 2>/dev/null || true)
+case "$state" in
+    running|degraded|starting|maintenance|initializing)
+        failed_count=$(systemctl --failed --no-legend | wc -l)
+        [[ "$failed_count" -eq 0 ]] || fail "${failed_count} failed unit(s): $(systemctl --failed --no-legend)"
+        pass "no failed units (state=${state})"
+        ;;
+    *)
+        log "warn: systemd not available (state='${state:-unknown}', acceptable in container without systemd PID 1)"
+        ;;
+esac
 
 # 10. andrew user exists in sudo group.
 id "$JINX_USER" >/dev/null 2>&1 || fail "user ${JINX_USER} missing"
