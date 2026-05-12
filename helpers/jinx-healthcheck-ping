@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# jinx-healthcheck-ping — POST disk%/load/failed-units to Healthchecks.io.
+# URL lives at /etc/jinx/healthchecks-url (single line, no trailing newline-sensitive).
+# Silently no-ops if the URL file is absent — bootstrap doesn't require it.
+set -euo pipefail
+
+URL_FILE=/etc/jinx/healthchecks-url
+[[ -r "$URL_FILE" ]] || exit 0
+
+URL="$(tr -d '[:space:]' < "$URL_FILE")"
+[[ -n "$URL" ]] || exit 0
+
+disk=$(df --output=pcent / | tail -1 | tr -dc '0-9')
+load=$(awk '{print $1}' /proc/loadavg)
+failed=$(systemctl --failed --no-legend | wc -l)
+
+curl -fsS -m 10 --retry 3 \
+    --data-urlencode "disk=${disk}%" \
+    --data-urlencode "load=${load}" \
+    --data-urlencode "failed=${failed}" \
+    "$URL" > /dev/null
