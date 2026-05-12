@@ -42,8 +42,10 @@ if [[ -d "${JINX_DIR}/.git" ]]; then
     git -C "$JINX_DIR" checkout --quiet "$JINX_REF"
     git -C "$JINX_DIR" pull --quiet --ff-only || log "pull --ff-only failed; staying at current ref"
 else
-    log "Cloning ${JINX_REPO} → ${JINX_DIR} at ref ${JINX_REF}"
-    git clone --quiet --branch "$JINX_REF" "$JINX_REPO" "$JINX_DIR"
+    log "Cloning ${JINX_REPO} → ${JINX_DIR}"
+    git clone --quiet "$JINX_REPO" "$JINX_DIR"
+    log "Checking out ref ${JINX_REF}"
+    git -C "$JINX_DIR" checkout --quiet "$JINX_REF"
 fi
 
 current_ref=$(git -C "$JINX_DIR" rev-parse --short HEAD)
