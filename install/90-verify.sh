@@ -41,11 +41,16 @@ else
     log "warn: caddy service not active (acceptable in container without systemd PID 1)"
 fi
 
-# 7. Caddy serving HTTPS on 127.0.0.1 (skip if caddy inactive).
+# 7. Caddy serving HTTPS via the apex site (skip if caddy inactive).
+# Use --resolve so SNI matches the configured site block — bare
+# `curl https://127.0.0.1/` has no/wrong SNI and Caddy rejects it
+# because no site is bound to 127.0.0.1.
 if systemctl is-active --quiet caddy 2>/dev/null; then
-    code=$(curl -ksI -o /dev/null -w '%{http_code}' --max-time 5 https://127.0.0.1/ || echo "0")
-    [[ "$code" == "200" ]] || fail "https://127.0.0.1/ returned $code (expected 200)"
-    pass "caddy serves 200 on 127.0.0.1"
+    code=$(curl -ksI -o /dev/null -w '%{http_code}' --max-time 5 \
+        --resolve jinx.generalproducts.io:443:127.0.0.1 \
+        https://jinx.generalproducts.io/ || echo "0")
+    [[ "$code" == "200" ]] || fail "apex via 127.0.0.1 returned $code (expected 200)"
+    pass "caddy serves 200 for apex via 127.0.0.1"
 fi
 
 # 8. Disk usage < 90%.
