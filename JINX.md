@@ -164,6 +164,20 @@ After committing in the jinx repo, scp the changed file to the box and reload (p
 
 ---
 
+## Bootstrap knobs
+
+`bootstrap.sh` reads three optional environment variables (defaults in parentheses):
+
+| Var | Default | Purpose |
+|---|---|---|
+| `JINX_REPO` | `https://github.com/andrewmcadoo/jinx.git` | Repo to clone for install scripts and configs. |
+| `JINX_REF` | `main` | Branch, tag, or commit to check out. Pin to a tag when launching a fresh box from a known-good state. |
+| `JINX_NOPASSWD` | unset | Set to `1` to install the opt-in blanket `sudoers/01-andrew-nopasswd` alongside the password-required default. Convenient when iterating; remove the file by hand once iteration is done. |
+
+Override via Lightsail user-data by editing `userdata.sh` after `scripts/make-userdata.sh` regenerates it. Example: `JINX_REF=v1.2.3 bash install/run.sh`.
+
+---
+
 ## Don't
 
 - ❌ Don't commit `.env.production`, `*.pem`, `*.key`, `*.crt`. The Jinx repo's `.gitignore` covers these defensively; this project's `.gitignore` should too.
