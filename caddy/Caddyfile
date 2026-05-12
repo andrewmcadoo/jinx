@@ -14,7 +14,38 @@
     auto_https off
 
     log default {
-        output file /var/log/caddy/caddy.log
+        output file /var/log/caddy/caddy.log {
+            roll_size 50mb
+            roll_keep 5
+            roll_keep_for 168h
+        }
+        format json
+    }
+}
+
+# Reusable log block for per-site Caddyfiles. Tuned tighter than Caddy's
+# defaults (100MB × 10 keeps = ~1GB per site) — 50MB × 5 keeps = ~250MB per
+# site, sized so even 10 sites stay well under the box's disk budget. The
+# 168h (7-day) max-keep-for ensures stale rotated logs don't pile up.
+#
+# Usage in a site file:
+#     import common_log <site-name>
+# … which expands to:
+#     log {
+#         output file /var/log/caddy/<site-name>.log {
+#             roll_size 50mb
+#             roll_keep 5
+#             roll_keep_for 168h
+#         }
+#         format json
+#     }
+(common_log) {
+    log {
+        output file /var/log/caddy/{args[0]}.log {
+            roll_size 50mb
+            roll_keep 5
+            roll_keep_for 168h
+        }
         format json
     }
 }

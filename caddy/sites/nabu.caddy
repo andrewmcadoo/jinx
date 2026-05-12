@@ -70,8 +70,5 @@ nabu.jinx.generalproducts.io {
         reverse_proxy 127.0.0.1:3001
     }
 
-    log {
-        output file /var/log/caddy/nabu.log
-        format json
-    }
+    import common_log nabu
 }
