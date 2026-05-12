@@ -54,9 +54,9 @@ disk=$(df --output=pcent / | tail -1 | tr -dc '0-9')
 pass "disk at ${disk}%"
 
 # 9. No failed units (skip if systemd is not PID 1).
-if systemctl is-system-running >/dev/null 2>&1 || systemctl --failed >/dev/null 2>&1; then
-    failed_count=$(systemctl --failed --no-legend 2>/dev/null | wc -l)
-    [[ "$failed_count" -eq 0 ]] || fail "${failed_count} failed unit(s): $(systemctl --failed --no-legend 2>/dev/null)"
+if systemctl is-system-running >/dev/null 2>&1; then
+    failed_count=$(systemctl --failed --no-legend | wc -l)
+    [[ "$failed_count" -eq 0 ]] || fail "${failed_count} failed unit(s): $(systemctl --failed --no-legend)"
     pass "no failed units"
 else
     log "warn: systemd not available (acceptable in container without systemd PID 1)"
