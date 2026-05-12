@@ -2,7 +2,6 @@
 # install/run.sh — orchestrates install/NN-*.sh in numeric order.
 set -euo pipefail
 IFS=$'\n\t'
-umask 022
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib.sh

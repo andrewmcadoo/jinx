@@ -7,6 +7,10 @@
 : "${JINX_USER:=andrew}"
 export JINX_LOG_FILE JINX_USER
 
+# Default file mode 0644, default dir mode 0755 for every step script,
+# regardless of how it's invoked (via run.sh or directly).
+umask 022
+
 log() {
     printf '[%s] %s\n' "${JINX_STEP:-bootstrap}" "$*" | tee -a "$JINX_LOG_FILE"
 }
