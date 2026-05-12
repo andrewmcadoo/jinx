@@ -1,0 +1,3 @@
+#!/bin/sh
+# /etc/cron.daily/jinx-prune-releases — installed by install/80-monitoring.sh.
+exec /usr/local/bin/jinx-prune-releases --keep 3

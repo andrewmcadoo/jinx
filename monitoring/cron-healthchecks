@@ -1,0 +1,5 @@
+# /etc/cron.d/jinx-healthchecks — installed by install/80-monitoring.sh.
+# 15-minute heartbeat to /etc/jinx/healthchecks-url (silent no-op if absent).
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+*/15 * * * * root /usr/local/bin/jinx-healthcheck-ping
