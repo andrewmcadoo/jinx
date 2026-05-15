@@ -1,0 +1,19 @@
+# Daily trigger for `mimir-purge.service`.
+# Daily cadence is intentional: the 30-day grace window doesn't need
+# sub-day precision, and a once-per-day batch keeps the audit trail
+# legible (one log scope per run, one set of structured logs per day).
+#
+# Persistent=true ensures a missed run after JINX downtime catches up on
+# the next boot — without it a multi-day outage could leave users with
+# elapsed grace windows still in `users` for an extra day.
+
+[Unit]
+Description=Daily timer for mimir-purge.service
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+Unit=mimir-purge.service
+
+[Install]
+WantedBy=timers.target

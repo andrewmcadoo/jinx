@@ -1,0 +1,31 @@
+# mimir-purge — daily hard-delete of users past their soft-delete grace window.
+# Install: sudo install -m 0644 -o root -g root mimir-purge.service /etc/systemd/system/
+#          sudo install -m 0644 -o root -g root mimir-purge.timer   /etc/systemd/system/
+#          sudo systemctl daemon-reload
+#          sudo systemctl enable --now mimir-purge.timer
+# DO NOT enable until /srv/mimir/current exists (see JINX.md "Don't").
+# Triggered by mimir-purge.timer (daily). Idempotent: zero candidates = zero side effects.
+
+[Unit]
+Description=Mimir soft-delete purge — hard-delete users past their grace window
+Wants=mimir-purge.timer
+After=network-online.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+User=andrew
+Group=andrew
+WorkingDirectory=/srv/mimir/current
+# Match mimir-api.service's PATH wiring: bun for the venv toolchain isn't
+# needed here, but uv must resolve.
+Environment=PATH=/home/andrew/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=/srv/mimir/shared/.env.production
+ExecStart=/home/andrew/.local/bin/uv run --no-sync --directory apps/api python -m app.jobs.purge_deleted_users
+
+# Hardening (mirror mimir-api.service):
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ReadWritePaths=/srv/mimir/shared
