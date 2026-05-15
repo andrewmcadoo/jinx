@@ -338,8 +338,12 @@ half added to GitHub at https://github.com/settings/keys (so
   password to brute-force), and HTTP/HTTPS is fronted by Cloudflare which
   absorbs scrapers and L7 floods. Fail2ban adds operational noise without
   meaningful gain at this tier.
-- **No swap.** 2 GB RAM is enough for the planned workloads; if memory pressure
-  appears, add a 2 GB swapfile rather than upsize the bundle.
+- **2 GB swapfile** at `/swapfile`, `vm.swappiness=10` (configured in
+  `install/15-swap.sh`). Swap is *not* there for performance — `small_3_0`
+  is fast enough on RAM alone — it's there to prevent OOM-kill cascades that
+  leave services wedged. The original spec hedged "no swap unless pressure
+  appears"; pressure appeared on 2026-05-15 (post-OOM sshd wedge that survived
+  a warm reboot, required Stop+Start to clear), so swap is now baseline.
 
 ## 6. Bootstrap and repo layout
 

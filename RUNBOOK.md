@@ -257,6 +257,82 @@ If a sudoers/sshd change locks you out:
 2. Fix the bad config.
 3. `sudo systemctl reload ssh`.
 
+## Emergency: SSH banner-exchange hang
+
+**Symptom:** `ssh jinx` (or any client) reports `Connection timed out during
+banner exchange`. TCP connect succeeds but sshd never sends its `SSH-2.0-...`
+banner. Browser-SSH from the Lightsail console may also hang. Observed
+2026-05-15 after a memory-pressure event left sshd wedged.
+
+**Confirm the signature** (rules out a key/auth problem — no auth is
+attempted, the hang is pre-banner):
+
+```bash
+ssh -vvv -o ConnectTimeout=10 -o BatchMode=yes jinx true
+# expected last lines:
+#   debug1: Connection established.
+#   ...
+#   Connection timed out during banner exchange
+```
+
+Quick sanity checks (all should be clean — if they're not, that's the
+problem, fix it instead of escalating):
+
+```bash
+dig +short jinx.generalproducts.io                                # DNS sane?
+nc -G 5 -zv <ip> 22                                               # TCP open?
+aws lightsail get-instance-port-states --region us-east-1 \
+    --instance-name jinx                                          # 22/tcp open from 0.0.0.0/0?
+aws lightsail get-instance --region us-east-1 --instance-name jinx \
+    --query 'instance.{state:state.name,publicIp:publicIpAddress}' # state == running?
+```
+
+**Recovery, in order (each step is more disruptive than the last):**
+
+1. **Warm reboot** — `aws lightsail reboot-instance --region us-east-1
+   --instance-name jinx`. ~60 s. Resolves transient sshd wedges, in-memory
+   fail2ban bans, and most kernel-level resource exhaustion.
+
+2. **Cold cycle (Stop+Start)** — if warm reboot didn't restore SSH, do:
+
+   ```bash
+   aws lightsail stop-instance  --region us-east-1 --instance-name jinx
+   # wait until state == stopped (~30–60 s)
+   aws lightsail start-instance --region us-east-1 --instance-name jinx
+   # wait until state == running, then sshd ~20 s later
+   ```
+
+   Why this works when warm reboot doesn't: `reboot-instance` is an OS-level
+   reboot — the VM stays on the same hypervisor with the same virtual NIC and
+   security-group enforcement state. `stop-instance` releases the VM
+   completely; `start-instance` re-attaches it cold, re-initializing the
+   hypervisor's network path. Symptoms that survive a warm reboot
+   (banner-exchange hang from a wedged virtual NIC, kernel network-stack
+   corruption from a bad upgrade) typically clear on cold start.
+
+   **Pre-flight:** the public IP must be a static IP attached to the
+   instance, otherwise Stop+Start will assign a new IP and break DNS.
+   Confirm with `aws lightsail get-static-ips --region us-east-1`.
+
+3. **Snapshot + rebuild** — if Stop+Start didn't help, the box is broken
+   below recoverable state. Snapshot for forensics, then rebuild from the
+   most recent good snapshot or from `bootstrap.sh`. See [Restoring from a
+   Lightsail snapshot](#restoring-from-a-lightsail-snapshot) above.
+
+**Likely root causes for this signature** (helps decide what to fix after
+you're back in):
+
+- **Memory pressure / OOM-kill cascade.** `small_3_0` is 1.9 GB RAM. If sshd
+  was the OOM victim or got a child killed mid-handshake, the listener can
+  end up half-alive: TCP accept works, banner write doesn't. The 2 GB
+  swapfile from `install/15-swap.sh` is the mitigation. Verify with
+  `free -h` after recovery.
+- **`UseDNS yes` + broken `/etc/resolv.conf`.** sshd does a reverse-lookup of
+  the client IP before sending the banner; a hung resolver presents as
+  banner-exchange timeout. `grep UseDNS /etc/ssh/sshd_config*`.
+- **Mid-upgrade kernel/sshd.** If an apt run was interrupted, sshd can be
+  in a half-installed state. `dpkg --audit` post-recovery.
+
 ## Useful commands on the box
 
 | Goal                              | Command                                      |
