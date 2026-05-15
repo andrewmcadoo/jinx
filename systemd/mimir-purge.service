@@ -20,8 +20,17 @@ WorkingDirectory=/srv/mimir/current
 # Match mimir-api.service's PATH wiring: bun for the venv toolchain isn't
 # needed here, but uv must resolve.
 Environment=PATH=/home/andrew/.local/bin:/usr/local/bin:/usr/bin:/bin
+# Same UV_CACHE_DIR redirect as mimir-api.service: ProtectHome=read-only
+# below makes ~/.cache/uv read-only, and `uv run` then fails with
+# "Could not acquire lock: Read-only file system". Redirect into
+# /srv/mimir/shared/uv-cache (in ReadWritePaths). Dir is mkdir'd by
+# scripts/deploy/deploy.sh.
+Environment=UV_CACHE_DIR=/srv/mimir/shared/uv-cache
 EnvironmentFile=/srv/mimir/shared/.env.production
-ExecStart=/home/andrew/.local/bin/uv run --no-sync --directory apps/api python -m app.jobs.purge_deleted_users
+# --frozen + --no-sync: see mimir-api.service comment. The deploy script
+# pre-syncs the venv; we must not let `uv run` regenerate shims under
+# /srv/mimir/releases/<ts>/ which is outside ReadWritePaths.
+ExecStart=/home/andrew/.local/bin/uv run --frozen --no-sync --directory apps/api python -m app.jobs.purge_deleted_users
 
 # Hardening (mirror mimir-api.service):
 NoNewPrivileges=true
