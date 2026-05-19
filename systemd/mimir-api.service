@@ -30,9 +30,19 @@ Environment=UV_CACHE_DIR=/srv/mimir/shared/uv-cache
 # pre-syncs the venv (`uv sync --frozen --no-dev`), so --no-sync is safe;
 # --frozen is defense-in-depth against accidental network resolution if
 # --no-sync is ever removed. (Rationale: nabu-fltc.)
-ExecStart=/home/andrew/.local/bin/uv run --frozen --no-sync uvicorn app.main:app --app-dir src --host 127.0.0.1 --port 3199
+# --timeout-graceful-shutdown 15: cap uvicorn's SIGTERM drain phase.
+# The default is "wait forever" — and the app's two long-lived SSE
+# streams (/v1/chat, /v1/me/events) never close on their own, so every
+# `systemctl restart` would otherwise wait the systemd-default
+# TimeoutStopSec=90s before SIGKILL. 15s cancels in-flight SSE
+# (clients reconnect via Last-Event-ID) while leaving p99 of
+# short-lived requests comfortable headroom. (Rationale: mimir-5acl.)
+ExecStart=/home/andrew/.local/bin/uv run --frozen --no-sync uvicorn app.main:app --app-dir src --host 127.0.0.1 --port 3199 --timeout-graceful-shutdown 15
 Restart=on-failure
 RestartSec=2s
+# 5s buffer past uvicorn's own 15s cap so uvicorn exits on its own
+# before systemd has to SIGKILL on the happy path. (mimir-5acl.)
+TimeoutStopSec=20s
 
 # Hardening — mirrors systemd/_example.service and nabu-api.service.
 NoNewPrivileges=true

@@ -28,6 +28,11 @@ Environment=HOSTNAME=127.0.0.1
 ExecStart=/home/andrew/.bun/bin/bun run start
 Restart=on-failure
 RestartSec=2s
+# Cap systemd's SIGTERM-to-SIGKILL window at 15s instead of the
+# 90s default. Next.js + bun don't surface useful graceful-shutdown
+# behavior here — getting SIGKILL'd at 15s is a 75s-per-deploy win
+# regardless of the underlying signal handling. (Rationale: mimir-5acl.)
+TimeoutStopSec=15s
 
 # Hardening — mirrors systemd/_example.service and nabu-web.service.
 NoNewPrivileges=true
