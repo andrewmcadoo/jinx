@@ -25,13 +25,18 @@ EnvironmentFile=/srv/mimir/shared/.env.production
 Environment=NODE_ENV=production
 Environment=PORT=3001
 Environment=HOSTNAME=127.0.0.1
-ExecStart=/home/andrew/.bun/bin/bun run start
+# Fast-shutdown launcher: sets NEXT_MANUAL_SIG_HANDLE=1 (disables Next's
+# prod SIGTERM handler, which calls http.Server.close() without
+# closeAllConnections() and hangs on long-lived SSE streams like
+# /v1/me/events) and installs an explicit handler that exits with
+# 143/SIGTERM immediately. Restart now completes in <1s instead of
+# hitting TimeoutStopSec and getting SIGKILL'd. (Rationale: mimir-t0nn.)
+ExecStart=/home/andrew/.bun/bin/bun run start:fast-shutdown
 Restart=on-failure
 RestartSec=2s
-# Cap systemd's SIGTERM-to-SIGKILL window at 15s instead of the
-# 90s default. Next.js + bun don't surface useful graceful-shutdown
-# behavior here — getting SIGKILL'd at 15s is a 75s-per-deploy win
-# regardless of the underlying signal handling. (Rationale: mimir-5acl.)
+# Belt-and-suspenders ceiling — no longer exercised now that
+# start:fast-shutdown exits in <1s, but kept so a future regression
+# doesn't silently revert to the 90s default. (Rationale: mimir-5acl.)
 TimeoutStopSec=15s
 
 # Hardening — mirrors systemd/_example.service and nabu-web.service.
