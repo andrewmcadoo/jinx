@@ -34,6 +34,12 @@ Environment=HOSTNAME=127.0.0.1
 ExecStart=/home/andrew/.bun/bin/bun run start:fast-shutdown
 Restart=on-failure
 RestartSec=2s
+# The fast-shutdown launcher exits 143 on SIGTERM / 130 on SIGINT —
+# those are intentional clean shutdowns, not failures. Mark them as
+# success so systemd doesn't log `Failed with result 'exit-code'` after
+# every restart and so `systemctl is-failed mimir-web` stays accurate.
+# (Rationale: mimir-hbu0.)
+SuccessExitStatus=143 130
 # Belt-and-suspenders ceiling — no longer exercised now that
 # start:fast-shutdown exits in <1s, but kept so a future regression
 # doesn't silently revert to the 90s default. (Rationale: mimir-5acl.)
