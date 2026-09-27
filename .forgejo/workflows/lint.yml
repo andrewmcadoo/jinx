@@ -1,0 +1,109 @@
+# Forgejo Actions copy of .github/workflows/lint.yml (Forgejo prefers .forgejo/workflows when present).
+# Diffs vs GitHub: full-URL for the non-mirrored shellcheck action; systemd installed for systemd-analyze in the container runner.
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Pinned to v2.0.0 SHA (not @master) to neutralise supply-chain risk
+      # if the upstream branch is ever hijacked. Bump the SHA when reviewing
+      # https://github.com/ludeeus/action-shellcheck/releases.
+      - uses: https://github.com/ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # v2.0.0
+        env:
+          SHELLCHECK_OPTS: -e SC1091
+
+  caddy-validate:
+    name: caddy validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Caddy
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
+          curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+            | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+          curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+            | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y caddy
+      - name: Pre-create paths Caddy validate expects on disk
+        # `caddy validate` instantiates writers AND loads TLS material — it's
+        # not a pure syntax check. In production these paths are populated by
+        # bootstrap.sh + scp from the operator's laptop; in CI we synthesize
+        # them so syntax + adapter validation can complete.
+        run: |
+          sudo install -d -m 0755 /var/log/caddy
+          sudo chown "$(id -un):$(id -gn)" /var/log/caddy
+          sudo install -d -m 0755 /etc/ssl/jinx
+          sudo openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout /etc/ssl/jinx/key.pem \
+            -out    /etc/ssl/jinx/cert.pem \
+            -subj   "/CN=ci-fake.invalid"
+          sudo chmod 0644 /etc/ssl/jinx/cert.pem
+          sudo chmod 0644 /etc/ssl/jinx/key.pem
+      - name: Validate Caddyfile
+        run: caddy validate --config caddy/Caddyfile
+
+  systemd-verify:
+    name: systemd-analyze verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install systemd-analyze (container runner lacks systemd)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq systemd
+      - name: Verify systemd units
+        # `verify` complains about missing paths — that's fine, we only fail
+        # on syntax/directive errors.
+        run: |
+          for unit in systemd/*.service; do
+            echo "=== $unit ==="
+            # Filter out warnings about non-existent paths/users/groups,
+            # which are expected on a CI host that doesn't have /srv set up.
+            output=$(systemd-analyze verify "$unit" 2>&1 || true)
+            echo "$output"
+            if echo "$output" | grep -qE "(Failed to parse|bad-setting|invalid-)"; then
+              exit 1
+            fi
+          done
+
+  visudo-check:
+    name: visudo syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate sudoers/00-andrew (single source of truth)
+        # The repo file sudoers/00-andrew is the canonical sudoers grant;
+        # bootstrap.sh inlines a heredoc with the same body. Validating the
+        # repo file directly means CI fails fast if anyone edits the canonical
+        # file with bad syntax — and removes the previous duplication where
+        # this job hardcoded "andrew ALL=(ALL) ALL".
+        run: sudo visudo -cf sudoers/00-andrew
+      - name: Validate sudoers/01-andrew-nopasswd (opt-in NOPASSWD)
+        # Opt-in blanket NOPASSWD override; not installed by bootstrap.sh,
+        # so there's no inline copy to diff against — just the syntax check.
+        # See sudoers/01-andrew-nopasswd header + RUNBOOK § "Developer
+        # convenience: blanket NOPASSWD" for the security trade-off.
+        run: sudo visudo -cf sudoers/01-andrew-nopasswd
+
+  userdata-drift:
+    name: userdata.sh matches bootstrap.sh
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Regenerate userdata.sh into a temp dir
+        run: |
+          tmp="$(mktemp -d)"
+          cp bootstrap.sh "$tmp/bootstrap.sh"
+          mkdir -p "$tmp/scripts"
+          cp scripts/make-userdata.sh "$tmp/scripts/"
+          (cd "$tmp" && bash scripts/make-userdata.sh)
+          diff -u userdata.sh "$tmp/userdata.sh"
